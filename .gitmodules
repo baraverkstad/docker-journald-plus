@@ -1,3 +1,0 @@
-[submodule "moby"]
-	path = moby
-	url = git@github.com:moby/moby.git
