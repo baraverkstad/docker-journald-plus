@@ -1,9 +1,28 @@
 # Agent Instructions
 
-This project uses **bd** (beads) for issue tracking. Run `bd onboard` to get started.
+See **README.md** for features, installation, and usage documentation.
+See **DEVELOPMENT.md** for build, test, and development workflow instructions.
 
-## Quick Reference
+## Project Goals & Ethos
+- **Core Utility**: A pure-Go Docker log driver for `journald` with multiline merging and priority parsing.
+- **Design Philosophy**: Radical brevity. Compact code. No CGO. Minimal dependencies.
+- **Architecture**: Plugin v2 (HTTP) -> FIFO Read -> Pipeline (Decode/Merge/Strip/Priority) -> Socket Write.
+- **Reliability**: Robust error handling is critical (log drivers cannot crash).
 
+## Workflows
+
+- **Issue Tracking**:
+    - Use `bd` (beads). See reference below.
+- **Verification**:
+    - Always run `make test` before finishing.
+    - Use `make plugin` to verify build.
+- **Session End**:
+    - Create issues for anything that needs follow-up
+    - Close finished issues, update in-progress items
+    - Commit all changes with a succinct message
+    - Ensure no temporary or uncommitted files remain
+
+### Quick Reference (bd)
 ```bash
 bd ready              # Find available work
 bd show <id>          # View issue details
@@ -11,14 +30,3 @@ bd update <id> --status in_progress  # Claim work
 bd close <id>         # Complete work
 bd sync               # Sync with git
 ```
-
-## Session Completion
-
-When ending a work session, complete ALL steps below. Work is NOT complete
-until all steps succeed.
-
-1. **File issues for remaining work** - Create issues for anything that needs follow-up
-2. **Run quality gates** (if code changed) - Tests, linters, builds
-3. **Update issue status** - Close finished work, update in-progress items
-4. **Git Commit** - Commit all changes with a message
-5. **Clean up** - Clear stashes, remove temporary files

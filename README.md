@@ -24,8 +24,9 @@ docker plugin install baraverkstad/journald-plus:latest
 ## Usage
 
 ```bash
-docker run --name myapp --log-driver journald-plus \
-  --log-opt tag=myapp \
+docker run --name myapp \
+  --log-driver journald-plus \
+  --log-opt strip-timestamp=true \
   myimage
 ```
 
@@ -35,8 +36,7 @@ Or set as default in `/etc/docker/daemon.json`:
 {
   "log-driver": "journald-plus",
   "log-opts": {
-    "multiline-regex": "^\\s",
-    "priority-prefix": "true"
+    "strip-timestamp": "true"
   }
 }
 ```
@@ -175,16 +175,12 @@ journalctl -t myapp -f                # follow (like tail -f)
 journalctl CONTAINER_ID=abc123def456  # by container ID
 ```
 
-## Building
+## Development
 
-```bash
-make              # Show all available targets
-make build        # Build Go binary locally
-make test         # Run tests
-make plugin       # Create Docker plugin
-make enable       # Enable plugin for testing
-```
+See **DEVELOPMENT.md** for build instructions, testing, and development workflow.
 
 ## License
 
-MIT
+This project is licensed under the **MIT License**. See the [LICENSE](LICENSE) for details.
+
+Copyright (c) 2026 Per Cederberg
