@@ -13,5 +13,9 @@ plugin-dir/
 *.swp
 *.swo
 
+# Agent
+.agent/memory/conversation-*
+.claude/settings.local.json
+
 # OS
 .DS_Store
