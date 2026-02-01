@@ -18,7 +18,7 @@ Implemented as a Docker managed plugin (v2), installed via `docker plugin instal
 ## Installation
 
 ```bash
-docker plugin install youruser/journald-plus:latest
+docker plugin install baraverkstad/journald-plus:latest
 ```
 
 ## Usage

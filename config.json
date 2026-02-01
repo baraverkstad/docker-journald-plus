@@ -1,6 +1,6 @@
 {
   "description": "Journald Plus - Docker log driver with multiline merging and priority detection",
-  "documentation": "https://github.com/cederberg/docker-journald-plus",
+  "documentation": "https://github.com/baraverkstad/docker-journald-plus",
   "entrypoint": ["/usr/bin/journald-plus"],
   "interface": {
     "types": ["docker.logdriver/1.0"],

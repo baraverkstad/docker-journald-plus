@@ -1,4 +1,4 @@
-module github.com/cederberg/docker-journald-plus
+module github.com/baraverkstad/docker-journald-plus
 
 go 1.25.6
 

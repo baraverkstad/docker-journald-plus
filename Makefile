@@ -1,4 +1,4 @@
-PLUGIN_NAME ?= cederberg/journald-plus
+PLUGIN_NAME ?= baraverkstad/journald-plus
 PLUGIN_TAG ?= latest
 PLUGIN_FULL = $(PLUGIN_NAME):$(PLUGIN_TAG)
 

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/cederberg/docker-journald-plus/driver"
+	"github.com/baraverkstad/docker-journald-plus/driver"
 	"github.com/docker/go-plugins-helpers/sdk"
 )
 
