@@ -24,10 +24,8 @@ docker plugin install youruser/journald-plus:latest
 ## Usage
 
 ```bash
-docker run --log-driver journald-plus \
-  --log-opt multiline-regex="^\s" \
-  --log-opt priority-prefix=true \
-  --log-opt priority-match-warning="^WARN|^\[WARNING\]" \
+docker run --name myapp --log-driver journald-plus \
+  --log-opt tag=myapp \
   myimage
 ```
 
@@ -49,7 +47,7 @@ Or set as default in `/etc/docker/daemon.json`:
 
 | Option | Description |
 |--------|-------------|
-| `tag` | Template for SYSLOG_IDENTIFIER. Default: first 12 chars of container ID. Supports Go templates (e.g. `{{.Name}}`). |
+| `tag` | Template for SYSLOG_IDENTIFIER. Default: container name. Supports Go templates (e.g. `{{.ID}}`). |
 | `labels` | Comma-separated list of container label keys to include as journal fields. |
 | `labels-regex` | Regex matching container label keys to include. |
 | `env` | Comma-separated list of container env var keys to include as journal fields. |
@@ -74,12 +72,12 @@ Or set as default in `/etc/docker/daemon.json`:
 | `priority-default-stderr` | `err` | Default priority for stderr messages. |
 | `priority-match-emerg` | *(none)* | Regex: if the first line of a message matches, set priority to EMERG (0). |
 | `priority-match-alert` | *(none)* | Regex: if the first line matches, set priority to ALERT (1). |
-| `priority-match-crit` | *(none)* | Regex: if the first line matches, set priority to CRIT (2). |
-| `priority-match-err` | *(none)* | Regex: if the first line matches, set priority to ERR (3). |
-| `priority-match-warning` | *(none)* | Regex: if the first line matches, set priority to WARNING (4). |
-| `priority-match-notice` | *(none)* | Regex: if the first line matches, set priority to NOTICE (5). |
+| `priority-match-crit` | `^CRITICAL\|^\[Critical\]` | Regex: if the first line matches, set priority to CRIT (2). |
+| `priority-match-err` | `^ERROR\|^FATAL\|^\[ERROR\]\|^\[Fatal\]` | Regex: if the first line matches, set priority to ERR (3). |
+| `priority-match-warning` | `^WARN\|^WARNING\|^\[Warning\]` | Regex: if the first line matches, set priority to WARNING (4). |
+| `priority-match-notice` | `^\[Note\]` | Regex: if the first line matches, set priority to NOTICE (5). |
 | `priority-match-info` | *(none)* | Regex: if the first line matches, set priority to INFO (6). |
-| `priority-match-debug` | *(none)* | Regex: if the first line matches, set priority to DEBUG (7). |
+| `priority-match-debug` | `^DEBUG\|^\[Debug\]` | Regex: if the first line matches, set priority to DEBUG (7). |
 
 Priority is resolved in this order (first match wins):
 1. `<N>` sd-daemon prefix (if `priority-prefix=true`)
@@ -127,8 +125,10 @@ The plugin requires the host's journald socket to be mounted into its rootfs
 `docker logs` is **not** supported -- use `journalctl` to read logs:
 
 ```bash
-journalctl CONTAINER_NAME=mycontainer
-journalctl CONTAINER_ID=abc123def456
+journalctl -t myapp                   # by tag (container name or custom tag)
+journalctl -t myapp -p warning        # only warnings and above
+journalctl -t myapp -f                # follow (like tail -f)
+journalctl CONTAINER_ID=abc123def456  # by container ID
 ```
 
 ## Building

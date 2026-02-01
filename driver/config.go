@@ -211,29 +211,35 @@ func ParseConfig(opts map[string]string) (*Config, error) {
 
 	// Priority matchers (ordered emerg..debug)
 	matchKeys := []struct {
-		opt string
-		pri Priority
+		opt        string
+		pri        Priority
+		defaultPat string // default regex if option not set; empty = no default
 	}{
-		{"priority-match-emerg", PriEmerg},
-		{"priority-match-alert", PriAlert},
-		{"priority-match-crit", PriCrit},
-		{"priority-match-err", PriErr},
-		{"priority-match-warning", PriWarning},
-		{"priority-match-notice", PriNotice},
-		{"priority-match-info", PriInfo},
-		{"priority-match-debug", PriDebug},
+		{"priority-match-emerg", PriEmerg, ""},
+		{"priority-match-alert", PriAlert, ""},
+		{"priority-match-crit", PriCrit, `^CRITICAL|^\[Critical\]`},
+		{"priority-match-err", PriErr, `^ERROR|^FATAL|^\[ERROR\]|^\[Fatal\]`},
+		{"priority-match-warning", PriWarning, `^WARN|^WARNING|^\[Warning\]`},
+		{"priority-match-notice", PriNotice, `^\[Note\]`},
+		{"priority-match-info", PriInfo, ""},
+		{"priority-match-debug", PriDebug, `^DEBUG|^\[Debug\]`},
 	}
 	for _, mk := range matchKeys {
-		if v, ok := opts[mk.opt]; ok && v != "" {
-			r, err := regexp.Compile(v)
-			if err != nil {
-				return nil, fmt.Errorf("invalid %s %q: %w", mk.opt, v, err)
-			}
-			cfg.PriorityMatchers = append(cfg.PriorityMatchers, priorityMatcher{
-				Priority: mk.pri,
-				Regex:    r,
-			})
+		pattern := mk.defaultPat
+		if v, ok := opts[mk.opt]; ok {
+			pattern = v // user override (empty string disables)
 		}
+		if pattern == "" {
+			continue
+		}
+		r, err := regexp.Compile(pattern)
+		if err != nil {
+			return nil, fmt.Errorf("invalid %s %q: %w", mk.opt, pattern, err)
+		}
+		cfg.PriorityMatchers = append(cfg.PriorityMatchers, priorityMatcher{
+			Priority: mk.pri,
+			Regex:    r,
+		})
 	}
 
 	return cfg, nil
