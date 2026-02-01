@@ -102,3 +102,57 @@ func TestJournalWriterCustomTag(t *testing.T) {
 		t.Errorf("CONTAINER_TAG = %q, want %q", lastVars["CONTAINER_TAG"], "myapp")
 	}
 }
+
+func TestJournalWriterTagTemplate(t *testing.T) {
+	tests := []struct {
+		name    string
+		tag     string
+		wantTag string
+	}{
+		{"default (empty) uses container name", "", "mycontainer"},
+		{"literal string", "myapp", "myapp"},
+		{"template {{.ID}}", "{{.ID}}", "abcdef123456"},
+		{"template {{.FullID}}", "{{.FullID}}", "abcdef123456789012345678"},
+		{"template {{.Name}}", "{{.Name}}", "mycontainer"},
+		{"template {{.ImageName}}", "{{.ImageName}}", "myimage:latest"},
+		{"composite template", "{{.Name}}/{{.ID}}", "mycontainer/abcdef123456"},
+		{"template {{.DaemonName}}", "{{.DaemonName}}/{{.Name}}", "docker/mycontainer"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := mustConfig(t, map[string]string{})
+			if tt.tag != "" {
+				cfg.Tag = tt.tag
+			}
+
+			infoJSON, _ := json.Marshal(containerInfo{
+				ContainerID:        "abcdef123456789012345678",
+				ContainerName:      "/mycontainer",
+				ContainerImageName: "myimage:latest",
+				ContainerImageID:   "sha256:deadbeef123456789012345678",
+				DaemonName:         "docker",
+			})
+
+			var lastVars map[string]string
+			sendFn := func(message string, priority Priority, vars map[string]string) error {
+				lastVars = vars
+				return nil
+			}
+
+			w, err := newJournalWriter(cfg, json.RawMessage(infoJSON), sendFn)
+			if err != nil {
+				t.Fatalf("newJournalWriter: %v", err)
+			}
+
+			w.Write(mergedMessage{Line: []byte("x"), Source: "stdout", TimeNano: 1000}, PriInfo, []byte("x"))
+
+			if lastVars["SYSLOG_IDENTIFIER"] != tt.wantTag {
+				t.Errorf("SYSLOG_IDENTIFIER = %q, want %q", lastVars["SYSLOG_IDENTIFIER"], tt.wantTag)
+			}
+			if lastVars["CONTAINER_TAG"] != tt.wantTag {
+				t.Errorf("CONTAINER_TAG = %q, want %q", lastVars["CONTAINER_TAG"], tt.wantTag)
+			}
+		})
+	}
+}

@@ -47,11 +47,30 @@ Or set as default in `/etc/docker/daemon.json`:
 
 | Option | Description |
 |--------|-------------|
-| `tag` | Template for SYSLOG_IDENTIFIER. Default: container name. Supports Go templates (e.g. `{{.ID}}`). |
+| `tag` | Template for SYSLOG_IDENTIFIER. Default: `{{.Name}}` (container name). Supports Go templates -- see below. |
 | `labels` | Comma-separated list of container label keys to include as journal fields. |
 | `labels-regex` | Regex matching container label keys to include. |
 | `env` | Comma-separated list of container env var keys to include as journal fields. |
 | `env-regex` | Regex matching container env var keys to include. |
+
+**Tag template variables:**
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `{{.Name}}` | Container name | `mycontainer` |
+| `{{.ID}}` | Short container ID (12 chars) | `abcdef123456` |
+| `{{.FullID}}` | Full container ID | `abcdef123456...` |
+| `{{.ImageName}}` | Image name | `nginx:latest` |
+| `{{.ImageID}}` | Short image ID (12 chars) | `deadbeef1234` |
+| `{{.ImageFullID}}` | Full image ID | `sha256:deadbeef...` |
+| `{{.Command}}` | Entrypoint + args | `nginx -g daemon off` |
+| `{{.DaemonName}}` | Docker daemon name | `docker` |
+
+Example: `--log-opt tag="{{.ImageName}}/{{.Name}}"`
+
+Note: the built-in journald driver defaults tag to `{{.ID}}` (short container ID).
+This plugin defaults to `{{.Name}}` (container name), which is more useful with
+`journalctl -t`.
 
 ### Multiline options
 

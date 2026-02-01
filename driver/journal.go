@@ -1,10 +1,12 @@
 package driver
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"regexp"
 	"strings"
+	"text/template"
 	"time"
 )
 
@@ -18,8 +20,52 @@ type containerInfo struct {
 	ContainerCreated   time.Time         `json:"ContainerCreated"`
 	ContainerEnv       []string          `json:"ContainerEnv"`
 	ContainerLabels    map[string]string `json:"ContainerLabels"`
-	DaemonName         string            `json:"DaemonName"`
+	DaemonName          string            `json:"DaemonName"`
+	ContainerEntrypoint string            `json:"ContainerEntrypoint"`
+	ContainerArgs       []string          `json:"ContainerArgs"`
 }
+
+// tagData provides the template variables available in the tag option.
+// Compatible with the built-in Docker log driver tag template variables.
+type tagData struct {
+	ID           string // Short (12-char) container ID
+	FullID       string // Full container ID
+	Name         string // Container name (without leading /)
+	ImageName    string // Image name
+	ImageID      string // Short (12-char) image ID
+	ImageFullID  string // Full image ID
+	Command      string // Container entrypoint + args
+	DaemonName   string // Docker daemon name
+}
+
+func newTagData(info *containerInfo) tagData {
+	td := tagData{
+		FullID:      info.ContainerID,
+		Name:        strings.TrimPrefix(info.ContainerName, "/"),
+		ImageName:   info.ContainerImageName,
+		ImageFullID: info.ContainerImageID,
+		DaemonName:  info.DaemonName,
+	}
+	if len(info.ContainerID) >= 12 {
+		td.ID = info.ContainerID[:12]
+	}
+	if len(info.ContainerImageID) >= 12 {
+		// Strip sha256: prefix if present
+		imgID := info.ContainerImageID
+		imgID = strings.TrimPrefix(imgID, "sha256:")
+		if len(imgID) >= 12 {
+			td.ImageID = imgID[:12]
+		}
+	}
+	cmd := info.ContainerEntrypoint
+	if len(info.ContainerArgs) > 0 {
+		cmd += " " + strings.Join(info.ContainerArgs, " ")
+	}
+	td.Command = cmd
+	return td
+}
+
+const defaultTagTemplate = "{{.Name}}"
 
 // journalWriter handles writing processed messages to journald.
 type journalWriter struct {
@@ -44,25 +90,29 @@ func newJournalWriter(cfg *Config, infoJSON json.RawMessage, sendFn JournalSendF
 		info:   info,
 		sendFn: sendFn,
 	}
-	w.baseVars = w.buildBaseVars()
+	baseVars, err := w.buildBaseVars()
+	if err != nil {
+		return nil, err
+	}
+	w.baseVars = baseVars
 	return w, nil
 }
 
-func (w *journalWriter) buildBaseVars() map[string]string {
+func (w *journalWriter) buildBaseVars() (map[string]string, error) {
 	vars := map[string]string{}
 
-	// Container metadata
-	if len(w.info.ContainerID) >= 12 {
-		vars["CONTAINER_ID"] = w.info.ContainerID[:12]
-	}
-	vars["CONTAINER_ID_FULL"] = w.info.ContainerID
-	vars["CONTAINER_NAME"] = strings.TrimPrefix(w.info.ContainerName, "/")
-	vars["IMAGE_NAME"] = w.info.ContainerImageName
+	td := newTagData(&w.info)
 
-	// Tag: default to container name
-	tag := w.cfg.Tag
-	if tag == "" {
-		tag = strings.TrimPrefix(w.info.ContainerName, "/")
+	// Container metadata
+	vars["CONTAINER_ID"] = td.ID
+	vars["CONTAINER_ID_FULL"] = td.FullID
+	vars["CONTAINER_NAME"] = td.Name
+	vars["IMAGE_NAME"] = td.ImageName
+
+	// Tag: render Go template, default to {{.Name}}
+	tag, err := renderTag(w.cfg.Tag, td)
+	if err != nil {
+		return nil, fmt.Errorf("rendering tag template: %w", err)
 	}
 	vars["CONTAINER_TAG"] = tag
 	vars["SYSLOG_IDENTIFIER"] = tag
@@ -79,7 +129,32 @@ func (w *journalWriter) buildBaseVars() map[string]string {
 	}
 	w.addFilteredFields(vars, envMap, w.cfg.Env, w.cfg.EnvRegex)
 
-	return vars
+	return vars, nil
+}
+
+// renderTag executes the tag as a Go template against container metadata.
+// If the tag is empty, uses defaultTagTemplate. If the tag contains no
+// template delimiters, it's used as a literal string.
+func renderTag(tagTmpl string, td tagData) (string, error) {
+	if tagTmpl == "" {
+		tagTmpl = defaultTagTemplate
+	}
+
+	// Fast path: no template syntax, use as literal
+	if !strings.Contains(tagTmpl, "{{") {
+		return tagTmpl, nil
+	}
+
+	tmpl, err := template.New("tag").Parse(tagTmpl)
+	if err != nil {
+		return "", fmt.Errorf("invalid tag template %q: %w", tagTmpl, err)
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, td); err != nil {
+		return "", fmt.Errorf("executing tag template %q: %w", tagTmpl, err)
+	}
+	return buf.String(), nil
 }
 
 func (w *journalWriter) addFilteredFields(vars map[string]string, source map[string]string, keys []string, re *regexp.Regexp) {
