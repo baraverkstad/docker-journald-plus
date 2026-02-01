@@ -1,7 +1,7 @@
 # Docker Journald Plus
 
-A Docker log driver plugin for systemd journald that improves upon the built-in
-journald driver by adding multiline message merging and log priority detection.
+A Docker journald log driver plugin that adds multiline message merging and log
+priority parsing.
 
 Implemented as a Docker managed plugin (v2), installed via `docker plugin install`.
 
@@ -186,4 +186,4 @@ make push         # Push to Docker Hub
 
 ## License
 
-TBD
+MIT

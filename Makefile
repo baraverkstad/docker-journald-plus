@@ -1,14 +1,19 @@
 PLUGIN_NAME ?= baraverkstad/journald-plus
 PLUGIN_TAG ?= latest
 PLUGIN_FULL = $(PLUGIN_NAME):$(PLUGIN_TAG)
-
 PLUGIN_DIR = plugin-dir
 
 .PHONY: build rootfs plugin enable disable push clean test
 
+all:
+	@echo '🌈 Makefile commands'
+	@grep -E -A 1 '^#' Makefile | awk 'BEGIN { RS = "--\n"; FS = "\n" }; { sub("#+ +", "", $$1); sub(":.*", "", $$2); printf " · make %-18s- %s\n", $$2, $$1}'
+
+# Compile sources
 build:
 	CGO_ENABLED=0 go build -ldflags='-s -w' -o journald-plus .
 
+# Run tests & code style checks
 test:
 	go test ./...
 
