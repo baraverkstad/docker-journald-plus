@@ -178,10 +178,11 @@ journalctl CONTAINER_ID=abc123def456  # by container ID
 ## Building
 
 ```bash
-make build        # Build the Go binary
-make plugin       # Build and create the Docker plugin
-make enable       # Enable the plugin
-make push         # Push to Docker Hub
+make              # Show all available targets
+make build        # Build Go binary locally
+make test         # Run tests
+make plugin       # Create Docker plugin
+make enable       # Enable plugin for testing
 ```
 
 ## License
