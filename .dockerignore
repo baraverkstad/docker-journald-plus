@@ -1,0 +1,6 @@
+moby/
+.agent/
+.git/
+.beads/
+plugin-dir/
+*.md
