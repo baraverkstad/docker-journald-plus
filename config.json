@@ -1,0 +1,38 @@
+{
+  "description": "Journald Plus - Docker log driver with multiline merging and priority detection",
+  "documentation": "https://github.com/cederberg/docker-journald-plus",
+  "entrypoint": ["/usr/bin/journald-plus"],
+  "interface": {
+    "types": ["docker.logdriver/1.0"],
+    "socket": "journald-plus.sock"
+  },
+  "network": {
+    "type": "host"
+  },
+  "mounts": [
+    {
+      "name": "journal-socket",
+      "description": "systemd journal socket for writing log entries",
+      "destination": "/run/systemd/journal/socket",
+      "source": "/run/systemd/journal/socket",
+      "type": "bind",
+      "options": ["rbind", "rw"]
+    }
+  ],
+  "env": [
+    {
+      "name": "LOG_LEVEL",
+      "description": "Plugin log level (debug, info, warn, error)",
+      "value": "info",
+      "settable": ["value"]
+    }
+  ],
+  "linux": {
+    "capabilities": [],
+    "allowAllDevices": false,
+    "devices": null
+  },
+  "ipchost": false,
+  "pidhost": false,
+  "propagatedMount": ""
+}
