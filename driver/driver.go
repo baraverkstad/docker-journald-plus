@@ -17,20 +17,28 @@ import (
 type Driver struct {
 	mu        sync.Mutex
 	consumers map[string]*logConsumer // keyed by FIFO path
+	sendFn    JournalSendFunc        // injectable for testing
 }
 
 // logConsumer tracks state for a single container's log stream.
 type logConsumer struct {
 	fifoPath string
-	info     StartLoggingRequest
+	cfg      *Config
+	writer   *journalWriter
 	cancel   context.CancelFunc
 	done     chan struct{}
 }
 
-// New creates a new Driver.
+// New creates a new Driver using the real journald send function.
 func New() *Driver {
+	return NewWithSendFunc(defaultJournalSend)
+}
+
+// NewWithSendFunc creates a Driver with a custom journal send function (for testing).
+func NewWithSendFunc(sendFn JournalSendFunc) *Driver {
 	return &Driver{
 		consumers: make(map[string]*logConsumer),
+		sendFn:    sendFn,
 	}
 }
 
@@ -77,6 +85,25 @@ func (d *Driver) handleStartLogging(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Parse container info to get Config map
+	var info containerInfo
+	if err := json.Unmarshal(req.Info, &info); err != nil {
+		respondErr(w, fmt.Errorf("parsing container info: %w", err))
+		return
+	}
+
+	cfg, err := ParseConfig(info.Config)
+	if err != nil {
+		respondErr(w, fmt.Errorf("invalid log options: %w", err))
+		return
+	}
+
+	writer, err := newJournalWriter(cfg, req.Info, d.sendFn)
+	if err != nil {
+		respondErr(w, fmt.Errorf("creating journal writer: %w", err))
+		return
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
 
@@ -89,7 +116,8 @@ func (d *Driver) handleStartLogging(w http.ResponseWriter, r *http.Request) {
 
 	lc := &logConsumer{
 		fifoPath: req.File,
-		info:     req,
+		cfg:      cfg,
+		writer:   writer,
 		cancel:   cancel,
 		done:     done,
 	}
@@ -132,25 +160,45 @@ func (d *Driver) handleCapabilities(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
-// consumeLog reads log entries from the FIFO and processes them.
+// consumeLog reads log entries from the FIFO, reassembles partials,
+// merges multiline, detects priority, and writes to journald.
 func (d *Driver) consumeLog(ctx context.Context, f io.ReadCloser, lc *logConsumer) {
 	defer close(lc.done)
 	defer f.Close()
+
+	partial := newPartialAssembler()
+
+	merger := newMultilineMerger(lc.cfg, func(msg mergedMessage) {
+		// Detect priority and write to journal
+		pri, line := DetectPriority(lc.cfg, msg.Line, msg.Source)
+		if err := lc.writer.Write(msg, pri, line); err != nil {
+			fmt.Printf("journald-plus: error writing to journal: %v\n", err)
+		}
+	})
 
 	dec := newLogEntryDecoder(f)
 	for {
 		var entry logEntry
 		if err := dec.decode(&entry); err != nil {
 			if err == io.EOF || ctx.Err() != nil {
-				return
+				break
 			}
 			fmt.Printf("journald-plus: error decoding log entry: %v\n", err)
-			return
+			break
 		}
 
-		// TODO: partial reassembly, multiline merge, priority detection, journald write
-		_ = entry
+		// 1. Reassemble partial messages
+		line, source, timeNano, complete := partial.Add(&entry)
+		if !complete {
+			continue
+		}
+
+		// 2. Feed into multiline merger
+		merger.AddLine(line, source, timeNano)
 	}
+
+	// Flush remaining buffered content
+	merger.Flush()
 }
 
 // --- HTTP helpers ---
