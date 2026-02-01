@@ -169,8 +169,13 @@ func (d *Driver) consumeLog(ctx context.Context, f io.ReadCloser, lc *logConsume
 	partial := newPartialAssembler()
 
 	merger := newMultilineMerger(lc.cfg, func(msg mergedMessage) {
+		line := msg.Line
+		// Strip timestamp (before priority detection so ^ERROR matches after stripping)
+		if lc.cfg.StripTimestamp {
+			line = StripTimestamp(line, lc.cfg.StripTimestampPatterns)
+		}
 		// Detect priority and write to journal
-		pri, line := DetectPriority(lc.cfg, msg.Line, msg.Source)
+		pri, line := DetectPriority(lc.cfg, line, msg.Source)
 		if err := lc.writer.Write(msg, pri, line); err != nil {
 			fmt.Printf("journald-plus: error writing to journal: %v\n", err)
 		}

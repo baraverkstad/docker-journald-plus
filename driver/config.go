@@ -49,6 +49,10 @@ type Config struct {
 	MultilineMaxBytes int
 	MultilineSep      string
 
+	// Timestamp stripping
+	StripTimestamp         bool
+	StripTimestampPatterns []*regexp.Regexp // compiled; nil if disabled
+
 	// Priority
 	PriorityPrefix       bool
 	PriorityDefaultStdout Priority
@@ -86,6 +90,9 @@ var knownOpts = map[string]bool{
 	"priority-match-notice":   true,
 	"priority-match-info":     true,
 	"priority-match-debug":    true,
+
+	"strip-timestamp":       true,
+	"strip-timestamp-regex": true,
 }
 
 // ParseConfig validates and parses a map of log-opt key/value pairs.
@@ -240,6 +247,32 @@ func ParseConfig(opts map[string]string) (*Config, error) {
 			Priority: mk.pri,
 			Regex:    r,
 		})
+	}
+
+	// Timestamp stripping
+	if v, ok := opts["strip-timestamp"]; ok {
+		b, err := strconv.ParseBool(v)
+		if err != nil {
+			return nil, fmt.Errorf("invalid strip-timestamp %q: must be true or false", v)
+		}
+		cfg.StripTimestamp = b
+	}
+	if cfg.StripTimestamp {
+		if v, ok := opts["strip-timestamp-regex"]; ok && v != "" {
+			// User-provided single pattern
+			patterns, err := compileTimestampPatterns([]string{v})
+			if err != nil {
+				return nil, fmt.Errorf("invalid strip-timestamp-regex %q: %w", v, err)
+			}
+			cfg.StripTimestampPatterns = patterns
+		} else {
+			// Use built-in patterns
+			patterns, err := compileTimestampPatterns(defaultTimestampPatterns)
+			if err != nil {
+				return nil, fmt.Errorf("compiling default timestamp patterns: %w", err)
+			}
+			cfg.StripTimestampPatterns = patterns
+		}
 	}
 
 	return cfg, nil

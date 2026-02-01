@@ -108,6 +108,31 @@ Priority is resolved in this order (first match wins):
 The `priority-default-stdout` and `priority-default-stderr` options accept
 these values: `emerg`, `alert`, `crit`, `err`, `warning`, `notice`, `info`, `debug`.
 
+### Timestamp stripping (experimental)
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `strip-timestamp` | `false` | Strip leading timestamps from log messages. Since journald records its own timestamps, application-level timestamps are often redundant. |
+| `strip-timestamp-regex` | *(built-in)* | Override the built-in timestamp patterns with a custom regex. Only used when `strip-timestamp=true`. |
+
+When enabled, timestamps are stripped **before** priority detection, so patterns
+like `^ERROR` work even when the original line was `2024-01-15 10:30:45 ERROR ...`.
+
+Built-in patterns recognize these formats:
+
+| Format | Example |
+|--------|---------|
+| ISO 8601 | `2024-01-15T10:30:45.123Z`, `2024-01-15 10:30:45,123 UTC` |
+| Go log | `2024/01/15 10:30:45` |
+| Syslog | `Jan 15 10:30:45` |
+| Apache/nginx CLF | `15/Oct/2024:10:30:45 +0200` |
+| Log4j DATE | `14 Nov 2017 20:30:20,434` |
+| Apache error | `Wed Oct 15 19:41:46.123456 2019` |
+
+Trailing separators (whitespace, `-`, `|`, `:`) after the timestamp are also
+stripped. Timezone abbreviations are limited to Z/UTC/GMT to avoid accidentally
+matching log level words like ERROR or WARN.
+
 ## Journal Fields
 
 Each log entry is written to journald with the following fields:
