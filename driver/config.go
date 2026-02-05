@@ -58,6 +58,11 @@ type Config struct {
 	PriorityDefaultStdout Priority
 	PriorityDefaultStderr Priority
 	PriorityMatchers      []priorityMatcher // ordered emerg..debug
+
+	// JSON parsing
+	ParseJSON        bool
+	JSONLevelKeys    []string // Keys to check for level/severity
+	JSONMessageKeys  []string // Keys to check for message body
 }
 
 type priorityMatcher struct {
@@ -93,6 +98,10 @@ var knownOpts = map[string]bool{
 
 	"strip-timestamp":       true,
 	"strip-timestamp-regex": true,
+
+	"parse-json":         true,
+	"json-level-keys":    true,
+	"json-message-keys":  true,
 }
 
 // ParseConfig validates and parses a map of log-opt key/value pairs.
@@ -273,6 +282,35 @@ func ParseConfig(opts map[string]string) (*Config, error) {
 			}
 			cfg.StripTimestampPatterns = patterns
 		}
+	}
+
+	// Parse JSON options
+	if v, ok := opts["parse-json"]; ok {
+		b, err := strconv.ParseBool(v)
+		if err != nil {
+			return nil, fmt.Errorf("invalid parse-json %q: must be true or false", v)
+		}
+		cfg.ParseJSON = b
+	}
+
+	// JSON level keys (comma-separated, defaults to "level,severity,log_level")
+	if v, ok := opts["json-level-keys"]; ok && v != "" {
+		cfg.JSONLevelKeys = strings.Split(v, ",")
+		for i := range cfg.JSONLevelKeys {
+			cfg.JSONLevelKeys[i] = strings.TrimSpace(cfg.JSONLevelKeys[i])
+		}
+	} else {
+		cfg.JSONLevelKeys = []string{"level", "severity", "log_level"}
+	}
+
+	// JSON message keys (comma-separated, defaults to "message,msg,log")
+	if v, ok := opts["json-message-keys"]; ok && v != "" {
+		cfg.JSONMessageKeys = strings.Split(v, ",")
+		for i := range cfg.JSONMessageKeys {
+			cfg.JSONMessageKeys[i] = strings.TrimSpace(cfg.JSONMessageKeys[i])
+		}
+	} else {
+		cfg.JSONMessageKeys = []string{"message", "msg", "log"}
 	}
 
 	return cfg, nil

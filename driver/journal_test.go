@@ -38,7 +38,7 @@ func TestJournalWriterBaseVars(t *testing.T) {
 	}
 
 	msg := mergedMessage{Line: []byte("hello"), Source: "stdout", TimeNano: 1000000000}
-	if err := w.Write(msg, PriInfo, []byte("hello")); err != nil {
+	if err := w.Write(msg, PriInfo, []byte("hello"), nil); err != nil {
 		t.Fatalf("Write: %v", err)
 	}
 
@@ -93,7 +93,7 @@ func TestJournalWriterCustomTag(t *testing.T) {
 	}
 
 	msg := mergedMessage{Line: []byte("x"), Source: "stdout", TimeNano: 1000}
-	w.Write(msg, PriInfo, []byte("x"))
+	w.Write(msg, PriInfo, []byte("x"), nil)
 
 	if lastVars["SYSLOG_IDENTIFIER"] != "myapp" {
 		t.Errorf("SYSLOG_IDENTIFIER = %q, want %q", lastVars["SYSLOG_IDENTIFIER"], "myapp")
@@ -145,7 +145,7 @@ func TestJournalWriterTagTemplate(t *testing.T) {
 				t.Fatalf("newJournalWriter: %v", err)
 			}
 
-			w.Write(mergedMessage{Line: []byte("x"), Source: "stdout", TimeNano: 1000}, PriInfo, []byte("x"))
+			w.Write(mergedMessage{Line: []byte("x"), Source: "stdout", TimeNano: 1000}, PriInfo, []byte("x"), nil)
 
 			if lastVars["SYSLOG_IDENTIFIER"] != tt.wantTag {
 				t.Errorf("SYSLOG_IDENTIFIER = %q, want %q", lastVars["SYSLOG_IDENTIFIER"], tt.wantTag)

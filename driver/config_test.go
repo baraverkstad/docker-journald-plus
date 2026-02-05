@@ -44,6 +44,17 @@ func TestParseConfigDefaults(t *testing.T) {
 		t.Errorf("PriorityDefaultStderr = %d, want %d", cfg.PriorityDefaultStderr, PriErr)
 	}
 
+	// JSON parsing defaults
+	if cfg.ParseJSON {
+		t.Error("ParseJSON should default to false")
+	}
+	if len(cfg.JSONLevelKeys) != 3 || cfg.JSONLevelKeys[0] != "level" || cfg.JSONLevelKeys[1] != "severity" || cfg.JSONLevelKeys[2] != "log_level" {
+		t.Errorf("JSONLevelKeys = %v, want [level severity log_level]", cfg.JSONLevelKeys)
+	}
+	if len(cfg.JSONMessageKeys) != 3 || cfg.JSONMessageKeys[0] != "message" || cfg.JSONMessageKeys[1] != "msg" || cfg.JSONMessageKeys[2] != "log" {
+		t.Errorf("JSONMessageKeys = %v, want [message msg log]", cfg.JSONMessageKeys)
+	}
+
 	// Default priority matchers should be populated
 	if len(cfg.PriorityMatchers) == 0 {
 		t.Fatal("PriorityMatchers should have defaults")
@@ -180,6 +191,49 @@ func TestParseConfigRejectsUnknown(t *testing.T) {
 	}
 }
 
+func TestParseConfigJSONOptions(t *testing.T) {
+	cfg, err := ParseConfig(map[string]string{
+		"parse-json":         "true",
+		"json-level-keys":    "lvl,severity",
+		"json-message-keys":  "text,body",
+	})
+	if err != nil {
+		t.Fatalf("ParseConfig: %v", err)
+	}
+
+	if !cfg.ParseJSON {
+		t.Error("ParseJSON should be true")
+	}
+
+	if len(cfg.JSONLevelKeys) != 2 || cfg.JSONLevelKeys[0] != "lvl" || cfg.JSONLevelKeys[1] != "severity" {
+		t.Errorf("JSONLevelKeys = %v, want [lvl severity]", cfg.JSONLevelKeys)
+	}
+
+	if len(cfg.JSONMessageKeys) != 2 || cfg.JSONMessageKeys[0] != "text" || cfg.JSONMessageKeys[1] != "body" {
+		t.Errorf("JSONMessageKeys = %v, want [text body]", cfg.JSONMessageKeys)
+	}
+}
+
+func TestParseConfigJSONOptionsWithSpaces(t *testing.T) {
+	cfg, err := ParseConfig(map[string]string{
+		"parse-json":         "true",
+		"json-level-keys":    " level , severity , log_level ",
+		"json-message-keys":  " message , msg , log ",
+	})
+	if err != nil {
+		t.Fatalf("ParseConfig: %v", err)
+	}
+
+	// Should trim spaces
+	if len(cfg.JSONLevelKeys) != 3 || cfg.JSONLevelKeys[0] != "level" || cfg.JSONLevelKeys[1] != "severity" || cfg.JSONLevelKeys[2] != "log_level" {
+		t.Errorf("JSONLevelKeys = %v, want [level severity log_level]", cfg.JSONLevelKeys)
+	}
+
+	if len(cfg.JSONMessageKeys) != 3 || cfg.JSONMessageKeys[0] != "message" || cfg.JSONMessageKeys[1] != "msg" || cfg.JSONMessageKeys[2] != "log" {
+		t.Errorf("JSONMessageKeys = %v, want [message msg log]", cfg.JSONMessageKeys)
+	}
+}
+
 func TestParseConfigRejectsInvalid(t *testing.T) {
 	tests := []struct {
 		name string
@@ -195,6 +249,7 @@ func TestParseConfigRejectsInvalid(t *testing.T) {
 		{"bad match regex", map[string]string{"priority-match-err": "[broken"}},
 		{"bad labels-regex", map[string]string{"labels-regex": "[broken"}},
 		{"bad env-regex", map[string]string{"env-regex": "[broken"}},
+		{"bad parse-json", map[string]string{"parse-json": "maybe"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

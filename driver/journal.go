@@ -175,31 +175,55 @@ func (w *journalWriter) addFilteredFields(vars map[string]string, source map[str
 	}
 }
 
-// sanitizeFieldName converts a label/env key to a valid journal field name.
-// Journal fields must be uppercase ASCII letters, digits, and underscores.
-func sanitizeFieldName(s string) string {
-	var b strings.Builder
-	for _, c := range strings.ToUpper(s) {
-		if (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' {
-			b.WriteRune(c)
+// sanitizeFieldName converts a string to a valid journal field name.
+// Journal field names must be uppercase ASCII letters, digits, or underscores.
+func sanitizeFieldName(name string) string {
+	var buf strings.Builder
+	buf.Grow(len(name))
+
+	for _, r := range name {
+		if r >= 'a' && r <= 'z' {
+			buf.WriteRune(r - 32) // Convert to uppercase
+		} else if r >= 'A' && r <= 'Z' {
+			buf.WriteRune(r)
+		} else if r >= '0' && r <= '9' {
+			buf.WriteRune(r)
 		} else {
-			b.WriteByte('_')
+			buf.WriteRune('_')
 		}
 	}
-	return b.String()
+
+	result := buf.String()
+	// Ensure first char is not a digit
+	if len(result) > 0 && result[0] >= '0' && result[0] <= '9' {
+		return "_" + result
+	}
+	return result
 }
 
-// Write sends a processed message to journald.
-func (w *journalWriter) Write(msg mergedMessage, priority Priority, line []byte) error {
-	vars := make(map[string]string, len(w.baseVars)+1)
+// Write sends a log entry to journald with optional JSON-extracted fields.
+func (w *journalWriter) Write(msg mergedMessage, pri Priority, processedLine []byte, jsonFields map[string]string) error {
+	vars := make(map[string]string, len(w.baseVars)+2+len(jsonFields))
+
+	// Add base fields
 	for k, v := range w.baseVars {
 		vars[k] = v
 	}
 
+	// Add JSON fields with JSON_ prefix
+	if len(jsonFields) > 0 {
+		for k, v := range jsonFields {
+			fieldName := "JSON_" + sanitizeFieldName(k)
+			vars[fieldName] = v
+		}
+	}
+
+	// Add timestamp
 	ts := time.Unix(0, msg.TimeNano)
 	if !ts.IsZero() {
 		vars["SYSLOG_TIMESTAMP"] = ts.Format(time.RFC3339Nano)
 	}
 
-	return w.sendFn(string(line), priority, vars)
+	// Send to journal
+	return w.sendFn(string(processedLine), pri, vars)
 }

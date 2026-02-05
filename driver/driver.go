@@ -197,13 +197,41 @@ func (d *Driver) consumeLog(ctx context.Context, f io.ReadCloser, lc *logConsume
 
 	merger := newMultilineMerger(lc.cfg, func(msg mergedMessage) {
 		line := msg.Line
+		var jsonFields map[string]string
+		var priority Priority
+		priorityDetected := false
+
+		// Try JSON parsing first if enabled
+		if parsed, ok := ParseJSONLog(lc.cfg, line); ok {
+			// JSON parsing succeeded
+			jsonFields = parsed.ExtraFields
+
+			// Use JSON message as log body
+			if parsed.Message != "" {
+				line = []byte(parsed.Message)
+			}
+
+			// Detect priority from JSON level field
+			if parsed.Level != "" {
+				if pri, ok := JSONLevelToPriority(parsed.Level); ok {
+					priority = pri
+					priorityDetected = true
+				}
+			}
+		}
+
 		// Strip timestamp (before priority detection so ^ERROR matches after stripping)
 		if lc.cfg.StripTimestamp {
 			line = StripTimestamp(line, lc.cfg.StripTimestampPatterns)
 		}
-		// Detect priority and write to journal
-		pri, line := DetectPriority(lc.cfg, line, msg.Source)
-		if err := lc.writer.Write(msg, pri, line); err != nil {
+
+		// Detect priority via regex/default if not already detected from JSON
+		if !priorityDetected {
+			priority, line = DetectPriority(lc.cfg, line, msg.Source)
+		}
+
+		// Write to journal with JSON fields
+		if err := lc.writer.Write(msg, priority, line, jsonFields); err != nil {
 			lc.logError("error writing to journal: %v", err)
 		}
 	})
