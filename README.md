@@ -174,7 +174,7 @@ Trailing separators (whitespace, `-`, `|`, `:`) after the timestamp are also
 stripped. Timezone abbreviations are limited to Z/UTC/GMT to avoid accidentally
 matching log level words like ERROR or WARN.
 
-### JSON log parsing
+### JSON log parsing (experimental)
 
 | Option | Default | Description |
 |--------|---------|-------------|
