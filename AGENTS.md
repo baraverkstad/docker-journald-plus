@@ -17,10 +17,12 @@ See **DEVELOPMENT.md** for build, test, and development workflow instructions.
     - Always run `make test` before finishing.
     - Use `make plugin` to verify build.
 - **Session End**:
-    - Create issues for anything that needs follow-up
-    - Close finished issues, update in-progress items
-    - Commit all changes with a succinct message
-    - Ensure no temporary or uncommitted files remain
+    - Create issues for follow-up work: `bd create --title="..." --type=task --priority=2`
+    - Close finished issues: `bd close <id>`
+    - Sync beads: `bd sync`
+    - Stage all changes: `git add .` (includes code AND .beads/*)
+    - Commit: `git commit -m "..."`
+    - Push: `git push`
 
 ### Quick Reference (bd)
 ```bash
