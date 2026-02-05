@@ -1,6 +1,7 @@
 package driver
 
 import (
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -156,5 +157,43 @@ func TestMultilineCustomSeparator(t *testing.T) {
 	}
 	if string(msgs[0].Line) != "first |   second" {
 		t.Errorf("msg = %q, want %q", string(msgs[0].Line), "first |   second")
+	}
+}
+
+func TestMultilineTimerRaceCondition(t *testing.T) {
+	cfg := mustConfig(t, map[string]string{
+		"multiline-timeout": "50ms",
+	})
+	var collected collectedMessages
+	m := newMultilineMerger(cfg, collected.add)
+
+	// Start multiline message
+	m.AddLine([]byte("line 1"), "stdout", 1000)
+
+	// Rapidly add continuations to trigger timer resets
+	for i := 0; i < 10; i++ {
+		time.Sleep(5 * time.Millisecond)
+		m.AddLine([]byte(fmt.Sprintf("  cont %d", i)), "stdout", 2000+int64(i))
+	}
+
+	// Wait less than timeout - should have 0 messages (no premature flush)
+	time.Sleep(30 * time.Millisecond)
+	msgs := collected.get()
+	if len(msgs) != 0 {
+		t.Errorf("got %d messages, want 0 (should still be buffering)", len(msgs))
+	}
+
+	// Wait for timeout to complete - should have exactly 1 merged message
+	time.Sleep(30 * time.Millisecond)
+	msgs = collected.get()
+	if len(msgs) != 1 {
+		t.Fatalf("got %d messages, want 1 (single merged message)", len(msgs))
+	}
+
+	// Verify all lines merged correctly
+	expected := "line 1\n  cont 0\n  cont 1\n  cont 2\n  cont 3\n  cont 4\n  cont 5\n  cont 6\n  cont 7\n  cont 8\n  cont 9"
+	if string(msgs[0].Line) != expected {
+		t.Errorf("message not properly merged:\ngot:  %q\nwant: %q",
+			string(msgs[0].Line), expected)
 	}
 }

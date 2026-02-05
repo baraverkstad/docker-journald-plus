@@ -18,13 +18,14 @@ type multilineMerger struct {
 	cfg    *Config
 	output func(mergedMessage)
 
-	mu        sync.Mutex
-	buf       bytes.Buffer
-	lineCount int
-	source    string
-	timeNano  int64
-	timer     *time.Timer
-	hasData   bool
+	mu         sync.Mutex
+	buf        bytes.Buffer
+	lineCount  int
+	source     string
+	timeNano   int64
+	timer      *time.Timer
+	hasData    bool
+	generation uint64
 }
 
 func newMultilineMerger(cfg *Config, output func(mergedMessage)) *multilineMerger {
@@ -131,9 +132,17 @@ func (m *multilineMerger) resetTimerLocked() {
 	if m.timer != nil {
 		m.timer.Stop()
 	}
+	m.generation++
+	currentGen := m.generation
+
 	m.timer = time.AfterFunc(m.cfg.MultilineTimeout, func() {
 		m.mu.Lock()
 		defer m.mu.Unlock()
+
+		if m.generation != currentGen {
+			return // Stale timer, abort
+		}
+
 		m.flushLocked()
 	})
 }
