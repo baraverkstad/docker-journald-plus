@@ -62,11 +62,7 @@ func StripTimestamp(line []byte, patterns []*regexp.Regexp) []byte {
 		if sepLoc := trailingSep.FindIndex(rest); sepLoc != nil && sepLoc[1] > 0 {
 			rest = rest[sepLoc[1]:]
 		}
-		// Only strip if there's something left
-		if len(rest) > 0 {
-			return rest
-		}
-		return line
+		return rest
 	}
 	return line
 }

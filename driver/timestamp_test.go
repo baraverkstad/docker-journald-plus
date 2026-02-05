@@ -149,10 +149,10 @@ func TestStripTimestampNoMatch(t *testing.T) {
 func TestStripTimestampOnlyTimestamp(t *testing.T) {
 	patterns := compileDefaults(t)
 
-	// If the entire line is just a timestamp, don't strip it (nothing left)
+	// If the entire line is just a timestamp, strip it and return empty
 	got := StripTimestamp([]byte("2024-01-15T10:30:45"), patterns)
-	if string(got) != "2024-01-15T10:30:45" {
-		t.Errorf("got %q, should be unchanged when nothing remains", string(got))
+	if string(got) != "" {
+		t.Errorf("got %q, want empty string when line is only timestamp", string(got))
 	}
 }
 
