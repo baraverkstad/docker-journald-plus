@@ -11,6 +11,8 @@ Implemented as a Docker managed plugin (v2), installed via `docker plugin instal
   entries based on configurable patterns
 - **Priority detection** -- log priority is inferred from message content using
   sd-daemon `<N>` prefixes and configurable regex patterns
+- **JSON log parsing** -- optional structured log parsing to extract level,
+  message, and custom fields from JSON-formatted logs
 - **All built-in journald fields** -- writes the same container metadata fields
   as the built-in driver (CONTAINER_ID, CONTAINER_NAME, IMAGE_NAME, etc.)
 - **Pure Go** -- no CGO required; writes to journald via the native socket protocol
@@ -171,6 +173,90 @@ Built-in patterns recognize these formats:
 Trailing separators (whitespace, `-`, `|`, `:`) after the timestamp are also
 stripped. Timezone abbreviations are limited to Z/UTC/GMT to avoid accidentally
 matching log level words like ERROR or WARN.
+
+### JSON log parsing
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `parse-json` | `false` | Parse log lines as JSON objects and extract structured fields. |
+| `json-level-keys` | `level,severity,log_level` | Comma-separated list of JSON keys to check for log level/priority (first match wins). |
+| `json-message-keys` | `message,msg,log` | Comma-separated list of JSON keys to extract as the message body (first match wins). |
+
+When `parse-json=true`, the driver attempts to parse each log line as a JSON object:
+
+1. **Level extraction** -- Checks `json-level-keys` (in order) and maps the value to a syslog priority
+2. **Message extraction** -- Checks `json-message-keys` (in order) and uses the value as MESSAGE
+3. **Field flattening** -- Remaining fields are added to journald with `JSON_` prefix
+4. **Graceful fallback** -- If parsing fails or no message key is found, the original line is used
+
+**Supported level mappings:**
+
+| JSON Level | Syslog Priority |
+|------------|-----------------|
+| `debug`, `trace` | DEBUG (7) |
+| `info`, `information` | INFO (6) |
+| `notice` | NOTICE (5) |
+| `warn`, `warning` | WARNING (4) |
+| `error`, `err` | ERR (3) |
+| `fatal`, `critical`, `crit` | CRIT (2) |
+| `panic`, `alert` | ALERT (1) |
+| `emerg`, `emergency` | EMERG (0) |
+
+Level strings are case-insensitive.
+
+**JSON parsing examples:**
+
+Basic usage with default keys:
+```bash
+docker run --log-driver journald-plus \
+  --log-opt parse-json=true \
+  myapp
+```
+
+Your application logs JSON:
+```json
+{"level":"error","message":"database connection failed","request_id":"abc123","retry_count":3}
+```
+
+Results in journald fields:
+- `MESSAGE=database connection failed`
+- `PRIORITY=3` (ERR)
+- `JSON_REQUEST_ID=abc123`
+- `JSON_RETRY_COUNT=3`
+
+Query with journalctl:
+```bash
+journalctl JSON_REQUEST_ID=abc123
+journalctl -p err  # Show all ERROR and above
+```
+
+Custom key names for non-standard JSON formats:
+```bash
+docker run --log-driver journald-plus \
+  --log-opt parse-json=true \
+  --log-opt json-level-keys='lvl,severity' \
+  --log-opt json-message-keys='text,body' \
+  myapp
+```
+
+With structured logging frameworks (e.g., OpenTelemetry):
+```json
+{"severity":"INFO","body":"Request processed","trace_id":"a1b2c3","span_id":"x9y8z7","duration_ms":42.5}
+```
+
+Results in:
+- `MESSAGE=Request processed`
+- `PRIORITY=6` (INFO)
+- `JSON_TRACE_ID=a1b2c3`
+- `JSON_SPAN_ID=x9y8z7`
+- `JSON_DURATION_MS=42.5`
+
+**Notes:**
+- Field names are sanitized for journald compatibility (uppercase, special chars replaced with `_`)
+- Nested JSON objects/arrays are serialized as JSON strings
+- Null values are omitted
+- If JSON parsing fails, the original line is logged as-is (no data loss)
+- Zero overhead when disabled (single boolean check)
 
 ## Journal Fields
 
