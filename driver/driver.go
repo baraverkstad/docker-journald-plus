@@ -18,7 +18,7 @@ import (
 type Driver struct {
 	mu        sync.Mutex
 	consumers map[string]*logConsumer // keyed by FIFO path
-	sendFn    JournalSendFunc        // injectable for testing
+	sendFn    JournalSendFunc         // injectable for testing
 }
 
 // logConsumer tracks state for a single container's log stream.

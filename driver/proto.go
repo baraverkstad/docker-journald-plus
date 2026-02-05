@@ -9,11 +9,11 @@ import (
 // logEntry represents a single log entry from the Docker daemon.
 // This mirrors the protobuf LogEntry from moby/daemon/logger/internal/logdriver.
 type logEntry struct {
-	Source              string
-	TimeNano            int64
-	Line                []byte
-	Partial             bool
-	PartialLogMetadata  *partialLogMetadata
+	Source             string
+	TimeNano           int64
+	Line               []byte
+	Partial            bool
+	PartialLogMetadata *partialLogMetadata
 }
 
 type partialLogMetadata struct {

@@ -193,9 +193,9 @@ func TestParseConfigRejectsUnknown(t *testing.T) {
 
 func TestParseConfigJSONOptions(t *testing.T) {
 	cfg, err := ParseConfig(map[string]string{
-		"parse-json":         "true",
-		"json-level-keys":    "lvl,severity",
-		"json-message-keys":  "text,body",
+		"parse-json":        "true",
+		"json-level-keys":   "lvl,severity",
+		"json-message-keys": "text,body",
 	})
 	if err != nil {
 		t.Fatalf("ParseConfig: %v", err)
@@ -216,9 +216,9 @@ func TestParseConfigJSONOptions(t *testing.T) {
 
 func TestParseConfigJSONOptionsWithSpaces(t *testing.T) {
 	cfg, err := ParseConfig(map[string]string{
-		"parse-json":         "true",
-		"json-level-keys":    " level , severity , log_level ",
-		"json-message-keys":  " message , msg , log ",
+		"parse-json":        "true",
+		"json-level-keys":   " level , severity , log_level ",
+		"json-message-keys": " message , msg , log ",
 	})
 	if err != nil {
 		t.Fatalf("ParseConfig: %v", err)

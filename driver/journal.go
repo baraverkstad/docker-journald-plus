@@ -12,14 +12,14 @@ import (
 
 // containerInfo holds parsed container metadata from Docker's Info JSON.
 type containerInfo struct {
-	Config             map[string]string `json:"Config"`
-	ContainerID        string            `json:"ContainerID"`
-	ContainerName      string            `json:"ContainerName"`
-	ContainerImageID   string            `json:"ContainerImageID"`
-	ContainerImageName string            `json:"ContainerImageName"`
-	ContainerCreated   time.Time         `json:"ContainerCreated"`
-	ContainerEnv       []string          `json:"ContainerEnv"`
-	ContainerLabels    map[string]string `json:"ContainerLabels"`
+	Config              map[string]string `json:"Config"`
+	ContainerID         string            `json:"ContainerID"`
+	ContainerName       string            `json:"ContainerName"`
+	ContainerImageID    string            `json:"ContainerImageID"`
+	ContainerImageName  string            `json:"ContainerImageName"`
+	ContainerCreated    time.Time         `json:"ContainerCreated"`
+	ContainerEnv        []string          `json:"ContainerEnv"`
+	ContainerLabels     map[string]string `json:"ContainerLabels"`
 	DaemonName          string            `json:"DaemonName"`
 	ContainerEntrypoint string            `json:"ContainerEntrypoint"`
 	ContainerArgs       []string          `json:"ContainerArgs"`
@@ -28,14 +28,14 @@ type containerInfo struct {
 // tagData provides the template variables available in the tag option.
 // Compatible with the built-in Docker log driver tag template variables.
 type tagData struct {
-	ID           string // Short (12-char) container ID
-	FullID       string // Full container ID
-	Name         string // Container name (without leading /)
-	ImageName    string // Image name
-	ImageID      string // Short (12-char) image ID
-	ImageFullID  string // Full image ID
-	Command      string // Container entrypoint + args
-	DaemonName   string // Docker daemon name
+	ID          string // Short (12-char) container ID
+	FullID      string // Full container ID
+	Name        string // Container name (without leading /)
+	ImageName   string // Image name
+	ImageID     string // Short (12-char) image ID
+	ImageFullID string // Full image ID
+	Command     string // Container entrypoint + args
+	DaemonName  string // Docker daemon name
 }
 
 func newTagData(info *containerInfo) tagData {

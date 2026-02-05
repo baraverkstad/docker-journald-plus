@@ -54,15 +54,15 @@ type Config struct {
 	StripTimestampPatterns []*regexp.Regexp // compiled; nil if disabled
 
 	// Priority
-	PriorityPrefix       bool
+	PriorityPrefix        bool
 	PriorityDefaultStdout Priority
 	PriorityDefaultStderr Priority
 	PriorityMatchers      []priorityMatcher // ordered emerg..debug
 
 	// JSON parsing
-	ParseJSON        bool
-	JSONLevelKeys    []string // Keys to check for level/severity
-	JSONMessageKeys  []string // Keys to check for message body
+	ParseJSON       bool
+	JSONLevelKeys   []string // Keys to check for level/severity
+	JSONMessageKeys []string // Keys to check for message body
 }
 
 type priorityMatcher struct {
@@ -99,9 +99,9 @@ var knownOpts = map[string]bool{
 	"strip-timestamp":       true,
 	"strip-timestamp-regex": true,
 
-	"parse-json":         true,
-	"json-level-keys":    true,
-	"json-message-keys":  true,
+	"parse-json":        true,
+	"json-level-keys":   true,
+	"json-message-keys": true,
 }
 
 // ParseConfig validates and parses a map of log-opt key/value pairs.

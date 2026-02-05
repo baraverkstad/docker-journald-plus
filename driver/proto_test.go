@@ -96,7 +96,7 @@ func TestDecodeBasicEntry(t *testing.T) {
 func TestDecodePartialEntry(t *testing.T) {
 	// Build partial metadata sub-message
 	var metaMsg []byte
-	metaMsg = append(metaMsg, encodeVarintField(1, 0)...)  // last = false
+	metaMsg = append(metaMsg, encodeVarintField(1, 0)...)   // last = false
 	metaMsg = append(metaMsg, encodeString(2, "abc123")...) // id
 	metaMsg = append(metaMsg, encodeVarintField(3, 2)...)   // ordinal = 2
 

@@ -87,12 +87,12 @@ func TestDetectPriorityPatternMatch(t *testing.T) {
 func TestDetectPriorityDefault(t *testing.T) {
 	cfg := mustConfig(t, map[string]string{
 		// Disable all matchers
-		"priority-prefix":      "false",
-		"priority-match-crit":  "",
-		"priority-match-err":   "",
+		"priority-prefix":        "false",
+		"priority-match-crit":    "",
+		"priority-match-err":     "",
 		"priority-match-warning": "",
-		"priority-match-notice": "",
-		"priority-match-debug": "",
+		"priority-match-notice":  "",
+		"priority-match-debug":   "",
 	})
 
 	pri, _ := DetectPriority(cfg, []byte("just a message"), "stdout")

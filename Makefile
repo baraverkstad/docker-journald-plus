@@ -15,6 +15,8 @@ build:
 
 # Run tests & code style checks
 test:
+	go vet ./...
+	@test -z "$$(gofmt -l .)" || (echo "Formatting issues in: $$(gofmt -l . | xargs)"; exit 1)
 	go test ./...
 
 # Build plugin and push to Docker Hub
