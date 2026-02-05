@@ -63,11 +63,19 @@ type Config struct {
 	ParseJSON       bool
 	JSONLevelKeys   []string // Keys to check for level/severity
 	JSONMessageKeys []string // Keys to check for message body
+
+	// Field extraction
+	FieldExtractors []fieldExtractor // Regex patterns to extract custom fields
 }
 
 type priorityMatcher struct {
 	Priority Priority
 	Regex    *regexp.Regexp
+}
+
+type fieldExtractor struct {
+	FieldName string
+	Regex     *regexp.Regexp
 }
 
 // known option keys
@@ -107,7 +115,7 @@ var knownOpts = map[string]bool{
 // ParseConfig validates and parses a map of log-opt key/value pairs.
 func ParseConfig(opts map[string]string) (*Config, error) {
 	for key := range opts {
-		if !knownOpts[key] {
+		if !knownOpts[key] && !strings.HasPrefix(key, "field-") {
 			return nil, fmt.Errorf("unknown log-opt %q", key)
 		}
 	}
@@ -313,6 +321,32 @@ func ParseConfig(opts map[string]string) (*Config, error) {
 		cfg.JSONMessageKeys = []string{"message", "msg", "log"}
 	}
 
+	// Field extractors (field-FIELDNAME options)
+	for key, pattern := range opts {
+		if !strings.HasPrefix(key, "field-") {
+			continue
+		}
+		fieldName := strings.TrimPrefix(key, "field-")
+		if fieldName == "" {
+			return nil, fmt.Errorf("invalid field extractor key %q: field name cannot be empty", key)
+		}
+		if pattern == "" {
+			return nil, fmt.Errorf("invalid field extractor %q: pattern cannot be empty", key)
+		}
+		r, err := regexp.Compile(pattern)
+		if err != nil {
+			return nil, fmt.Errorf("invalid field extractor %q pattern %q: %w", key, pattern, err)
+		}
+		// Validate that the pattern has at least one capture group
+		if r.NumSubexp() == 0 {
+			return nil, fmt.Errorf("invalid field extractor %q pattern %q: must contain at least one capture group ()", key, pattern)
+		}
+		cfg.FieldExtractors = append(cfg.FieldExtractors, fieldExtractor{
+			FieldName: fieldName,
+			Regex:     r,
+		})
+	}
+
 	return cfg, nil
 }
 
@@ -322,4 +356,24 @@ func parsePriorityName(s string) (Priority, error) {
 		return 0, fmt.Errorf("unknown priority %q (valid: emerg, alert, crit, err, warning, notice, info, debug)", s)
 	}
 	return p, nil
+}
+
+// ExtractFields applies field extractors to a message and returns extracted field values.
+// Returns a map of field names to extracted values.
+func (c *Config) ExtractFields(message string) map[string]string {
+	if len(c.FieldExtractors) == 0 {
+		return nil
+	}
+	fields := make(map[string]string)
+	for _, extractor := range c.FieldExtractors {
+		matches := extractor.Regex.FindStringSubmatch(message)
+		if len(matches) > 1 {
+			// Use first capture group
+			fields[extractor.FieldName] = matches[1]
+		}
+	}
+	if len(fields) == 0 {
+		return nil
+	}
+	return fields
 }

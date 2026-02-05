@@ -156,3 +156,66 @@ func TestJournalWriterTagTemplate(t *testing.T) {
 		})
 	}
 }
+
+func TestJournalWriterFieldExtraction(t *testing.T) {
+	cfg := mustConfig(t, map[string]string{
+		"field-REQUEST_ID": `request_id=([a-z0-9]+)`,
+		"field-USER_ID":    `user=(\d+)`,
+	})
+
+	infoJSON, _ := json.Marshal(containerInfo{
+		ContainerID:   "abcdef123456789012345678",
+		ContainerName: "/testcontainer",
+	})
+
+	var lastVars map[string]string
+	sendFn := func(message string, priority Priority, vars map[string]string) error {
+		lastVars = vars
+		return nil
+	}
+
+	w, err := newJournalWriter(cfg, json.RawMessage(infoJSON), sendFn)
+	if err != nil {
+		t.Fatalf("newJournalWriter: %v", err)
+	}
+
+	// Test with both fields present
+	msg := mergedMessage{Line: []byte("test"), Source: "stdout", TimeNano: 1000}
+	processedLine := []byte("Processing request_id=abc123 for user=42")
+	if err := w.Write(msg, PriInfo, processedLine, nil); err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+
+	if lastVars["REQUEST_ID"] != "abc123" {
+		t.Errorf("REQUEST_ID = %q, want %q", lastVars["REQUEST_ID"], "abc123")
+	}
+	if lastVars["USER_ID"] != "42" {
+		t.Errorf("USER_ID = %q, want %q", lastVars["USER_ID"], "42")
+	}
+
+	// Test with only one field present
+	processedLine = []byte("Log line request_id=xyz789 without user")
+	if err := w.Write(msg, PriInfo, processedLine, nil); err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+
+	if lastVars["REQUEST_ID"] != "xyz789" {
+		t.Errorf("REQUEST_ID = %q, want %q", lastVars["REQUEST_ID"], "xyz789")
+	}
+	if _, ok := lastVars["USER_ID"]; ok {
+		t.Errorf("USER_ID should not be present, got %q", lastVars["USER_ID"])
+	}
+
+	// Test with no fields matching
+	processedLine = []byte("Simple log line")
+	if err := w.Write(msg, PriInfo, processedLine, nil); err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+
+	if _, ok := lastVars["REQUEST_ID"]; ok {
+		t.Errorf("REQUEST_ID should not be present, got %q", lastVars["REQUEST_ID"])
+	}
+	if _, ok := lastVars["USER_ID"]; ok {
+		t.Errorf("USER_ID should not be present, got %q", lastVars["USER_ID"])
+	}
+}

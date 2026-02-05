@@ -250,6 +250,10 @@ func TestParseConfigRejectsInvalid(t *testing.T) {
 		{"bad labels-regex", map[string]string{"labels-regex": "[broken"}},
 		{"bad env-regex", map[string]string{"env-regex": "[broken"}},
 		{"bad parse-json", map[string]string{"parse-json": "maybe"}},
+		{"field extractor no capture group", map[string]string{"field-REQUEST_ID": "request_id=[a-z0-9]+"}},
+		{"field extractor bad regex", map[string]string{"field-USER_ID": "[invalid"}},
+		{"field extractor empty name", map[string]string{"field-": "pattern"}},
+		{"field extractor empty pattern", map[string]string{"field-TEST": ""}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -258,5 +262,113 @@ func TestParseConfigRejectsInvalid(t *testing.T) {
 				t.Error("expected error")
 			}
 		})
+	}
+}
+
+func TestParseConfigFieldExtractors(t *testing.T) {
+	cfg, err := ParseConfig(map[string]string{
+		"field-REQUEST_ID": `request_id=([a-z0-9]+)`,
+		"field-USER_ID":    `user=(\d+)`,
+		"field-TRACE_ID":   `trace[:\s]+([a-f0-9]{32})`,
+	})
+	if err != nil {
+		t.Fatalf("ParseConfig: %v", err)
+	}
+
+	if len(cfg.FieldExtractors) != 3 {
+		t.Fatalf("got %d field extractors, want 3", len(cfg.FieldExtractors))
+	}
+
+	// Check field names are present (order may vary due to map iteration)
+	names := make(map[string]bool)
+	for _, fe := range cfg.FieldExtractors {
+		names[fe.FieldName] = true
+		if fe.Regex == nil {
+			t.Errorf("field %s has nil regex", fe.FieldName)
+		}
+	}
+
+	for _, want := range []string{"REQUEST_ID", "USER_ID", "TRACE_ID"} {
+		if !names[want] {
+			t.Errorf("missing field extractor %s", want)
+		}
+	}
+}
+
+func TestExtractFields(t *testing.T) {
+	cfg, err := ParseConfig(map[string]string{
+		"field-REQUEST_ID": `request_id=([a-z0-9]+)`,
+		"field-USER_ID":    `user=(\d+)`,
+		"field-SESSION":    `session:([a-f0-9-]{36})`,
+	})
+	if err != nil {
+		t.Fatalf("ParseConfig: %v", err)
+	}
+
+	tests := []struct {
+		name    string
+		message string
+		want    map[string]string
+	}{
+		{
+			name:    "single field match",
+			message: "Processing request_id=abc123 for endpoint",
+			want:    map[string]string{"REQUEST_ID": "abc123"},
+		},
+		{
+			name:    "multiple fields match",
+			message: "request_id=xyz789 user=42 completed",
+			want:    map[string]string{"REQUEST_ID": "xyz789", "USER_ID": "42"},
+		},
+		{
+			name:    "all fields match",
+			message: "request_id=test123 user=999 session:550e8400-e29b-41d4-a716-446655440000 done",
+			want: map[string]string{
+				"REQUEST_ID": "test123",
+				"USER_ID":    "999",
+				"SESSION":    "550e8400-e29b-41d4-a716-446655440000",
+			},
+		},
+		{
+			name:    "no match",
+			message: "simple log line",
+			want:    nil,
+		},
+		{
+			name:    "partial match",
+			message: "request_id=partial no user",
+			want:    map[string]string{"REQUEST_ID": "partial"},
+		},
+		{
+			name:    "first capture group only",
+			message: "request_id=abc123def extra text",
+			want:    map[string]string{"REQUEST_ID": "abc123def"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := cfg.ExtractFields(tt.message)
+			if len(got) != len(tt.want) {
+				t.Errorf("got %d fields, want %d: %v", len(got), len(tt.want), got)
+			}
+			for k, v := range tt.want {
+				if got[k] != v {
+					t.Errorf("field %s = %q, want %q", k, got[k], v)
+				}
+			}
+		})
+	}
+}
+
+func TestExtractFieldsNoExtractors(t *testing.T) {
+	cfg, err := ParseConfig(map[string]string{})
+	if err != nil {
+		t.Fatalf("ParseConfig: %v", err)
+	}
+
+	result := cfg.ExtractFields("request_id=abc123")
+	if result != nil {
+		t.Errorf("expected nil when no extractors configured, got %v", result)
 	}
 }

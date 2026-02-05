@@ -53,6 +53,12 @@ Or set as default in `/etc/docker/daemon.json`:
 | `env` | Comma-separated list of container env var keys to include as journal fields. |
 | `env-regex` | Regex matching container env var keys to include. |
 
+### Field extraction options
+
+| Option | Description |
+|--------|-------------|
+| `field-FIELDNAME` | Extract data from log messages into a custom journald field. The option name specifies the field name (e.g., `field-REQUEST_ID`). The option value is a regex pattern with a capture group `(...)`. The first capture group's value is extracted. Multiple field extractors can be specified. |
+
 **Tag template variables:**
 
 | Variable | Description | Example |
@@ -71,6 +77,39 @@ Example: `--log-opt tag="{{.ImageName}}/{{.Name}}"`
 Note: the built-in journald driver defaults tag to `{{.ID}}` (short container ID).
 This plugin defaults to `{{.Name}}` (container name), which is more useful with
 `journalctl -t`.
+
+**Field extraction examples:**
+
+Extract request ID from logs:
+```bash
+--log-opt field-REQUEST_ID='request_id=([a-z0-9]+)'
+```
+
+Extract multiple fields:
+```bash
+--log-opt field-REQUEST_ID='request_id=([a-z0-9]+)' \
+--log-opt field-USER_ID='user=(\d+)' \
+--log-opt field-TRACE_ID='trace[:\s]+([a-f0-9]{32})'
+```
+
+Query with journalctl:
+```bash
+journalctl REQUEST_ID=abc123
+journalctl USER_ID=42
+```
+
+In `/etc/docker/daemon.json`:
+```json
+{
+  "log-driver": "journald-plus",
+  "log-opts": {
+    "field-REQUEST_ID": "request_id=([a-z0-9]+)",
+    "field-USER_ID": "user=(\\d+)"
+  }
+}
+```
+
+Note: In JSON, backslashes must be escaped (`\\d` instead of `\d`).
 
 ### Multiline options
 
@@ -149,7 +188,11 @@ Each log entry is written to journald with the following fields:
 | `CONTAINER_TAG` | Formatted tag |
 | `IMAGE_NAME` | Container image name |
 
-Plus any fields from `labels`, `labels-regex`, `env`, `env-regex` options.
+Plus any fields from:
+- `labels`, `labels-regex` options (container labels)
+- `env`, `env-regex` options (environment variables)
+- `field-*` options (extracted from log messages via regex)
+- `parse-json` option (JSON fields with `JSON_` prefix)
 
 ## Architecture
 
