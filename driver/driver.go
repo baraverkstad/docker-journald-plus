@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/containerd/fifo"
 	"github.com/docker/go-plugins-helpers/sdk"
@@ -27,6 +28,10 @@ type logConsumer struct {
 	writer   *journalWriter
 	cancel   context.CancelFunc
 	done     chan struct{}
+
+	errMu          sync.Mutex
+	lastErrLog     time.Time
+	suppressedErrs int
 }
 
 // New creates a new Driver using the real journald send function.
@@ -160,6 +165,28 @@ func (d *Driver) handleCapabilities(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
+// logError rate-limits error logging to prevent log floods.
+// Logs at most 1 error per minute; suppressed errors are counted.
+func (lc *logConsumer) logError(format string, args ...interface{}) {
+	lc.errMu.Lock()
+	defer lc.errMu.Unlock()
+
+	now := time.Now()
+	elapsed := now.Sub(lc.lastErrLog)
+
+	if elapsed >= time.Minute {
+		if lc.suppressedErrs > 0 {
+			fmt.Printf("journald-plus: suppressed %d errors in last %v\n",
+				lc.suppressedErrs, elapsed.Round(time.Second))
+			lc.suppressedErrs = 0
+		}
+		fmt.Printf("journald-plus: "+format+"\n", args...)
+		lc.lastErrLog = now
+	} else {
+		lc.suppressedErrs++
+	}
+}
+
 // consumeLog reads log entries from the FIFO, reassembles partials,
 // merges multiline, detects priority, and writes to journald.
 func (d *Driver) consumeLog(ctx context.Context, f io.ReadCloser, lc *logConsumer) {
@@ -177,7 +204,7 @@ func (d *Driver) consumeLog(ctx context.Context, f io.ReadCloser, lc *logConsume
 		// Detect priority and write to journal
 		pri, line := DetectPriority(lc.cfg, line, msg.Source)
 		if err := lc.writer.Write(msg, pri, line); err != nil {
-			fmt.Printf("journald-plus: error writing to journal: %v\n", err)
+			lc.logError("error writing to journal: %v", err)
 		}
 	})
 
@@ -188,7 +215,7 @@ func (d *Driver) consumeLog(ctx context.Context, f io.ReadCloser, lc *logConsume
 			if err == io.EOF || ctx.Err() != nil {
 				break
 			}
-			fmt.Printf("journald-plus: error decoding log entry: %v\n", err)
+			lc.logError("error decoding log entry: %v", err)
 			break
 		}
 
