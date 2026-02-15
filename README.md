@@ -27,7 +27,7 @@ docker plugin install baraverkstad/journald-plus:latest
 
 ```bash
 docker run --name myapp \
-  --log-driver journald-plus \
+  --log-driver baraverkstad/journald-plus \
   --log-opt strip-timestamp=true \
   myimage
 ```
@@ -36,7 +36,7 @@ Or set as default in `/etc/docker/daemon.json`:
 
 ```json
 {
-  "log-driver": "journald-plus",
+  "log-driver": "baraverkstad/journald-plus",
   "log-opts": {
     "strip-timestamp": "true"
   }
@@ -103,7 +103,7 @@ journalctl USER_ID=42
 In `/etc/docker/daemon.json`:
 ```json
 {
-  "log-driver": "journald-plus",
+  "log-driver": "baraverkstad/journald-plus",
   "log-opts": {
     "field-REQUEST_ID": "request_id=([a-z0-9]+)",
     "field-USER_ID": "user=(\\d+)"
@@ -208,7 +208,7 @@ Level strings are case-insensitive.
 
 Basic usage with default keys:
 ```bash
-docker run --log-driver journald-plus \
+docker run --log-driver baraverkstad/journald-plus \
   --log-opt parse-json=true \
   myapp
 ```
@@ -232,7 +232,7 @@ journalctl -p err  # Show all ERROR and above
 
 Custom key names for non-standard JSON formats:
 ```bash
-docker run --log-driver journald-plus \
+docker run --log-driver baraverkstad/journald-plus \
   --log-opt parse-json=true \
   --log-opt json-level-keys='lvl,severity' \
   --log-opt json-message-keys='text,body' \

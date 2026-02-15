@@ -1,6 +1,5 @@
 # Build artifacts
-journald-plus
-plugin-dir/
+tmp/
 
 # Go
 *.exe
