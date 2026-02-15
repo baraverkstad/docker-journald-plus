@@ -119,3 +119,49 @@ func TestDetectPrioritySdDaemonBeforePattern(t *testing.T) {
 		t.Errorf("msg = %q, want %q", string(msg), "ERROR in module")
 	}
 }
+
+func TestDetectPriorityWithPrefix(t *testing.T) {
+	cfg := mustConfig(t, map[string]string{"priority-prefix": "false"})
+
+	tests := []struct {
+		line    string
+		source  string
+		wantPri Priority
+	}{
+		// MariaDB style: timestamp stripped but numeric prefix remains
+		{" 0 [Note] InnoDB: Buffer pool size", "stdout", PriNotice},
+		{" 1 [Warning] InnoDB: Disk full", "stdout", PriWarning},
+		{" 0 [ERROR] Connection refused", "stdout", PriErr},
+
+		// Other prefixes
+		{"123 ERROR failed to connect", "stdout", PriErr},
+		{"  WARN deprecated API", "stdout", PriWarning},
+		{"[2026-02-15] CRITICAL system failure", "stdout", PriCrit},
+		{"thread-42 DEBUG entering function", "stdout", PriDebug},
+		{"pid:1234 FATAL cannot recover", "stdout", PriErr},
+
+		// Longer prefixes (up to 30 chars should work)
+		{"very-long-prefix-here-12345 ERROR timeout", "stdout", PriErr},
+	}
+
+	for _, tt := range tests {
+		pri, msg := DetectPriority(cfg, []byte(tt.line), tt.source)
+		if pri != tt.wantPri {
+			t.Errorf("line %q: priority = %d, want %d", tt.line, pri, tt.wantPri)
+		}
+		if string(msg) != tt.line {
+			t.Errorf("line %q: message was modified to %q", tt.line, string(msg))
+		}
+	}
+}
+
+func TestDetectPriorityPrefixTooLong(t *testing.T) {
+	cfg := mustConfig(t, map[string]string{"priority-prefix": "false"})
+
+	// Prefix longer than 30 chars should not match, falls through to default
+	line := "this-is-a-very-long-prefix-that-exceeds-thirty-characters ERROR occurred"
+	pri, _ := DetectPriority(cfg, []byte(line), "stdout")
+	if pri != PriInfo {
+		t.Errorf("priority = %d, want %d (should fall through to default)", pri, PriInfo)
+	}
+}

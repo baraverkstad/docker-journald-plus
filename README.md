@@ -132,12 +132,12 @@ Note: In JSON, backslashes must be escaped (`\\d` instead of `\d`).
 | `priority-default-stderr` | `err` | Default priority for stderr messages. |
 | `priority-match-emerg` | *(none)* | Regex: if the first line of a message matches, set priority to EMERG (0). |
 | `priority-match-alert` | *(none)* | Regex: if the first line matches, set priority to ALERT (1). |
-| `priority-match-crit` | `^CRITICAL\|^\[Critical\]` | Regex: if the first line matches, set priority to CRIT (2). |
-| `priority-match-err` | `^ERROR\|^FATAL\|^\[ERROR\]\|^\[Fatal\]` | Regex: if the first line matches, set priority to ERR (3). |
-| `priority-match-warning` | `^WARN\|^WARNING\|^\[Warning\]` | Regex: if the first line matches, set priority to WARNING (4). |
-| `priority-match-notice` | `^\[Note\]` | Regex: if the first line matches, set priority to NOTICE (5). |
+| `priority-match-crit` | `^.{0,30}(CRITICAL\|\[Critical\])` | Regex: if the first line matches, set priority to CRIT (2). Allows up to 30 chars prefix. |
+| `priority-match-err` | `^.{0,30}(ERROR\|FATAL\|\[ERROR\]\|\[Fatal\])` | Regex: if the first line matches, set priority to ERR (3). Allows up to 30 chars prefix. |
+| `priority-match-warning` | `^.{0,30}(WARN\|WARNING\|\[Warning\])` | Regex: if the first line matches, set priority to WARNING (4). Allows up to 30 chars prefix. |
+| `priority-match-notice` | `^.{0,30}\[Note\]` | Regex: if the first line matches, set priority to NOTICE (5). Allows up to 30 chars prefix. |
 | `priority-match-info` | *(none)* | Regex: if the first line matches, set priority to INFO (6). |
-| `priority-match-debug` | `^DEBUG\|^\[Debug\]` | Regex: if the first line matches, set priority to DEBUG (7). |
+| `priority-match-debug` | `^.{0,30}(DEBUG\|\[Debug\])` | Regex: if the first line matches, set priority to DEBUG (7). Allows up to 30 chars prefix. |
 
 Priority is resolved in this order (first match wins):
 1. `<N>` sd-daemon prefix (if `priority-prefix=true`)
@@ -156,8 +156,11 @@ these values: `emerg`, `alert`, `crit`, `err`, `warning`, `notice`, `info`, `deb
 | `strip-timestamp` | `false` | Strip leading timestamps from log messages. Since journald records its own timestamps, application-level timestamps are often redundant. |
 | `strip-timestamp-regex` | *(built-in)* | Override the built-in timestamp patterns with a custom regex. Only used when `strip-timestamp=true`. |
 
-When enabled, timestamps are stripped **before** priority detection, so patterns
-like `^ERROR` work even when the original line was `2024-01-15 10:30:45 ERROR ...`.
+When enabled, timestamps are stripped **before** priority detection. The default
+priority patterns allow up to 30 characters prefix, which handles cases where
+timestamp stripping leaves behind other prefixes. For example, MariaDB logs like
+`2026-02-15 15:15:16 0 [Note] InnoDB:...` become ` 0 [Note] InnoDB:...` after
+timestamp stripping, and the `[Note]` pattern will still match.
 
 Built-in patterns recognize these formats:
 

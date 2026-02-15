@@ -234,6 +234,8 @@ func ParseConfig(opts map[string]string) (*Config, error) {
 	}
 
 	// Priority matchers (ordered emerg..debug)
+	// Each pattern allows up to 30 chars prefix to handle cases like:
+	//   "2026-02-15 15:15:16 0 [Note] InnoDB:..." after timestamp stripping -> " 0 [Note] InnoDB:..."
 	matchKeys := []struct {
 		opt        string
 		pri        Priority
@@ -241,12 +243,12 @@ func ParseConfig(opts map[string]string) (*Config, error) {
 	}{
 		{"priority-match-emerg", PriEmerg, ""},
 		{"priority-match-alert", PriAlert, ""},
-		{"priority-match-crit", PriCrit, `^CRITICAL|^\[Critical\]`},
-		{"priority-match-err", PriErr, `^ERROR|^FATAL|^\[ERROR\]|^\[Fatal\]`},
-		{"priority-match-warning", PriWarning, `^WARN|^WARNING|^\[Warning\]`},
-		{"priority-match-notice", PriNotice, `^\[Note\]`},
+		{"priority-match-crit", PriCrit, `^.{0,30}(CRITICAL|\[Critical\])`},
+		{"priority-match-err", PriErr, `^.{0,30}(ERROR|FATAL|\[ERROR\]|\[Fatal\])`},
+		{"priority-match-warning", PriWarning, `^.{0,30}(WARN|WARNING|\[Warning\])`},
+		{"priority-match-notice", PriNotice, `^.{0,30}\[Note\]`},
 		{"priority-match-info", PriInfo, ""},
-		{"priority-match-debug", PriDebug, `^DEBUG|^\[Debug\]`},
+		{"priority-match-debug", PriDebug, `^.{0,30}(DEBUG|\[Debug\])`},
 	}
 	for _, mk := range matchKeys {
 		pattern := mk.defaultPat
