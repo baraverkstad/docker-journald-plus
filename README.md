@@ -32,6 +32,18 @@ docker run --name myapp \
   myimage
 ```
 
+Or in `docker-compose.yml`:
+
+```yaml
+services:
+  app:
+    image: myapp:latest
+    logging:
+      driver: baraverkstad/journald-plus
+      options:
+        strip-timestamp: "true"
+```
+
 Or set as default in `/etc/docker/daemon.json`:
 
 ```json
