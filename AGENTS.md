@@ -11,24 +11,4 @@ See **DEVELOPMENT.md** for build, test, and development workflow instructions.
 
 ## Workflows
 
-- **Issue Tracking**:
-    - Use `bd` (beads). See reference below.
-- **Verification**:
-    - Always run `make test` before finishing.
-    - Use `make plugin` to verify build.
-- **Session End**:
-    - Create issues for follow-up work: `bd create --title="..." --type=task --priority=2`
-    - Close finished issues: `bd close <id>`
-    - Sync beads: `bd sync`
-    - Stage all changes: `git add .` (includes code AND .beads/*)
-    - Commit: `git commit -m "..."`
-    - Push: `git push`
-
-### Quick Reference (bd)
-```bash
-bd ready              # Find available work
-bd show <id>          # View issue details
-bd update <id> --status in_progress  # Claim work
-bd close <id>         # Complete work
-bd sync               # Sync with git
-```
+- Always run `make build test` before finishing

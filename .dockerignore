@@ -1,5 +1,5 @@
 .agent/
+.claude/
 .git/
-.beads/
-plugin-dir/
 *.md
+tmp/
