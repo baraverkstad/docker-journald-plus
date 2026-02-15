@@ -1,0 +1,44 @@
+name: Build & Publish
+
+on:
+  push:
+    branches:
+      - 'main'
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.26'
+
+      - name: Set Version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: echo "VERSION=${{ github.ref_name }}" >> $GITHUB_ENV
+
+      - name: Build & Test
+        run: make VERSION=${{ env.VERSION }} build test
+
+      - name: Install QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Install Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Publish Plugin
+        run: make VERSION=${{ env.VERSION }} publish
