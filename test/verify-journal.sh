@@ -1,13 +1,13 @@
 #!/bin/sh
 #
-# Verify journald-plus output after running the test container.
+# Verify baraverkstad/journald-plus output after running test-logging.sh.
 # Run on the host after:
-#   docker run --log-driver journald-plus --log-opt tag=test-jp --rm test-jp-image
+#   docker run --rm -i --log-driver baraverkstad/journald-plus --log-opt tag=test alpine:latest sh < test/test-logging.sh
 #
 # Usage: ./verify-journal.sh [tag]
-#   tag defaults to "test-jp"
+#   tag defaults to "test"
 
-TAG="${1:-test-jp}"
+TAG="${1:-test}"
 
 echo "=== All entries (verbose) ==="
 journalctl -t "$TAG" --no-pager -o verbose --since "5 min ago"
@@ -42,18 +42,21 @@ check() {
     fi
 }
 
-check "sd-daemon <3> -> err"           "Error via sd-daemon"         "err"
-check "sd-daemon <4> -> warning"       "Warning via sd-daemon"       "warning"
-check "sd-daemon <7> -> debug"         "Debug via sd-daemon"         "debug"
-check "ERROR pattern -> err"           "something went wrong"        "err"
-check "FATAL pattern -> err"           "process crashed"             "err"
-check "WARNING pattern -> warning"     "disk usage high"             "warning"
-check "[Note] pattern -> notice"       "Server socket created"       "notice"
-check "DEBUG pattern -> debug"         "variable x = 42"             "debug"
-check "stderr default -> err"          "Simple stderr message"       "err"
-check "stdout default -> info"         "Simple stdout message"       "info"
-check "Multiline java stack trace"     "NullPointerException"        "err"
-check "Multiline python traceback"     "Traceback"                   "err"
+check "Basic stdout gets info"              "Simple.*stdout"              "info"
+check "Basic stderr gets err"               "Simple.*stderr"              "err"
+check "sd-daemon <3> stdout -> err"         "Error.*sd-daemon.*stdout"    "err"
+check "sd-daemon <3> stderr -> err"         "Error.*sd-daemon.*stderr"    "err"
+check "sd-daemon <4> stdout -> warning"     "Warning.*sd-daemon.*stdout"  "warning"
+check "sd-daemon <7> stdout -> debug"       "Debug.*sd-daemon.*stdout"    "debug"
+check "ERROR pattern stdout -> err"         "ERROR.*wrong.*stdout"        "err"
+check "ERROR pattern stderr -> err"         "ERROR.*wrong.*stderr"        "err"
+check "FATAL pattern stdout -> err"         "FATAL.*crashed.*stdout"      "err"
+check "WARNING pattern stdout -> warning"   "WARNING.*high.*stdout"       "warning"
+check "WARNING pattern stderr -> warning"   "WARNING.*high.*stderr"       "warning"
+check "[Note] pattern stdout -> notice"     "Note.*socket.*stdout"        "notice"
+check "DEBUG pattern stdout -> debug"       "DEBUG.*42.*stdout"           "debug"
+check "Multiline java stack trace"          "NullPointerException"        "err"
+check "Multiline python traceback"          "Traceback"                   "err"
 
 echo ""
 echo "Done. Review verbose output above for multiline merge correctness."
