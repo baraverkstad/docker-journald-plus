@@ -8,7 +8,7 @@ import (
 	"github.com/docker/go-plugins-helpers/sdk"
 )
 
-const socketName = "journald-plus"
+const socketName = "journald-plus.sock"
 
 func main() {
 	h := sdk.NewHandler(`{"Implements": ["LogDriver"]}`)
