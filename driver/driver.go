@@ -193,6 +193,12 @@ func (d *Driver) consumeLog(ctx context.Context, f io.ReadCloser, lc *logConsume
 	defer close(lc.done)
 	defer f.Close()
 
+	// Ensure FIFO is closed when context is canceled to interrupt blocking reads
+	go func() {
+		<-ctx.Done()
+		f.Close()
+	}()
+
 	partial := newPartialAssembler()
 
 	merger := newMultilineMerger(lc.cfg, func(msg mergedMessage) {
