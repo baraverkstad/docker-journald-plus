@@ -6,9 +6,6 @@
     "types": ["docker.logdriver/1.0"],
     "socket": "journald-plus.sock"
   },
-  "network": {
-    "type": "none"
-  },
   "mounts": [
     {
       "name": "journal-socket",
