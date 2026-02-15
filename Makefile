@@ -1,34 +1,26 @@
-PLUGIN_NAME ?= baraverkstad/journald-plus
-PLUGIN_TAG ?= latest
-PLUGIN_DIR = tmp/plugin
+COMMIT  := $(shell GIT_CONFIG_GLOBAL=/dev/null git rev-parse --short=8 HEAD)
+DATE    := $(or $(DATE),$(shell date '+%F'))
+VER     := $(if $(VERSION),$(patsubst v%,%,$(VERSION)),$(shell date '+%Y.%m.%d').$(COMMIT)-SNAPSHOT)
+REPO    := baraverkstad/journald-plus
+TAG     := $(or $(VERSION),latest)
 
-.PHONY: all clean build build-docker test publish
+.PHONY: all clean build test publish
 
 all:
 	@echo '🌈 Makefile commands'
 	@grep -E -A 1 '^#' Makefile | awk 'BEGIN { RS = "--\n"; FS = "\n" }; { sub("#+ +", "", $$1); sub(":.*", "", $$2); printf " · make %-18s- %s\n", $$2, $$1}'
 	@echo
 	@echo '🚀 Release builds'
-	@echo ' · make PLUGIN_TAG=v1.0.0 publish'
+	@echo ' · make VERSION=v1.0.0 clean build test publish'
 
 # Cleanup build artifacts
 clean:
 	rm -rf tmp
-	docker rm -f journald-plus-tmp 2>/dev/null || true
-	docker rmi journald-plus-build 2>/dev/null || true
 
 # Compile Go binary
 build:
 	mkdir -p tmp/build
 	CGO_ENABLED=0 go build -ldflags='-s -w' -o tmp/build/journald-plus .
-
-build-docker:
-	docker build -t journald-plus-build -f Dockerfile .
-	mkdir -p $(PLUGIN_DIR)/rootfs
-	docker create --name journald-plus-tmp journald-plus-build true
-	docker export journald-plus-tmp | tar -x -C $(PLUGIN_DIR)/rootfs
-	docker rm journald-plus-tmp
-	cp config.json $(PLUGIN_DIR)/
 
 # Run tests & code style checks
 test:
@@ -36,10 +28,22 @@ test:
 	@test -z "$$(gofmt -l .)" || (echo "Formatting issues in: $$(gofmt -l . | xargs)"; exit 1)
 	go test ./...
 
-# Build plugin and push to Docker Hub
-publish: PLUGIN_FULL = $(PLUGIN_NAME):$(PLUGIN_TAG)
-publish: clean build-docker
-	docker plugin create $(PLUGIN_FULL) $(PLUGIN_DIR)
-	docker plugin push $(PLUGIN_FULL)
-	docker plugin rm $(PLUGIN_FULL)
-	@echo "✅ Plugin $(PLUGIN_FULL) published to Docker Hub"
+define publish-arch
+	@echo "📦 Building linux/$(1)..."
+	mkdir -p tmp/plugin-$(1)/rootfs
+	docker buildx build --platform linux/$(1) \
+		--output type=local,dest=tmp/plugin-$(1)/rootfs .
+	cp config.json tmp/plugin-$(1)/
+	docker plugin create $(REPO):$(TAG)-$(1) tmp/plugin-$(1)
+	docker plugin push $(REPO):$(TAG)-$(1)
+	docker plugin rm $(REPO):$(TAG)-$(1)
+endef
+
+# Build and push plugin for multiple architectures
+publish: clean
+	$(call publish-arch,amd64)
+	$(call publish-arch,arm64)
+	docker plugin create $(REPO):$(TAG) tmp/plugin-amd64
+	docker plugin push $(REPO):$(TAG)
+	docker plugin rm $(REPO):$(TAG)
+	@echo "✅ Published $(REPO):{$(TAG),$(TAG)-amd64,$(TAG)-arm64}"
