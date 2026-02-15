@@ -6,5 +6,5 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 go build -ldflags='-s -w -extldflags "-static"' -o /usr/bin/journald-plus .
 
-FROM alpine:3.23
+FROM scratch
 COPY --from=builder /usr/bin/journald-plus /usr/bin/journald-plus

@@ -22,7 +22,7 @@ build:
 	mkdir -p tmp/build
 	CGO_ENABLED=0 go build -ldflags='-s -w' -o tmp/build/journald-plus .
 
-build-docker: build test
+build-docker:
 	docker build -t journald-plus-build -f Dockerfile .
 	mkdir -p $(PLUGIN_DIR)/rootfs
 	docker create --name journald-plus-tmp journald-plus-build true

@@ -7,7 +7,7 @@
     "socket": "journald-plus.sock"
   },
   "network": {
-    "type": "host"
+    "type": "none"
   },
   "mounts": [
     {
