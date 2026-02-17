@@ -2,6 +2,7 @@
 
 See **README.md** for features, installation, and usage documentation.
 See **DEVELOPMENT.md** for build, test, and development workflow instructions.
+See **.agent/memory/KNOWLEDGE-BASE.md** for project preferences and know-how.
 
 ## Project Goals & Ethos
 - **Core Utility**: A pure-Go Docker log driver for `journald` with multiline merging and priority parsing.
