@@ -12,10 +12,22 @@ make publish      # Build multi-arch plugins and push to Docker Hub
 
 ## Project Layout
 
-- `main.go`: Plugin API entrypoint
-- `driver/`: Core logic
-- `config.json`: Plugin manifest
-- `tmp/`: Build artifacts
+| File | Responsibility |
+|------|----------------|
+| `main.go` | Plugin API entrypoint |
+| `driver/driver.go` | HTTP handlers, consumer lifecycle, orchestration |
+| `driver/config.go` | Parse and validate log-opt options into `Config` struct |
+| `driver/journal.go` | Build journald field list and write entries |
+| `driver/journal_send.go` | Low-level journald socket protocol (pure Go) |
+| `driver/multiline.go` | Continuation-line merging with configurable regex/timeout |
+| `driver/partial.go` | Reassemble split protobuf log entries |
+| `driver/priority.go` | Priority detection (prefix, regex, default) |
+| `driver/timestamp.go` | Strip leading timestamps from log lines |
+| `driver/json.go` | Parse JSON log lines, map level strings to priorities |
+| `driver/proto.go` | Decode protobuf `LogEntry` from FIFO |
+| `test/` | Integration test scripts |
+| `config.json` | Plugin manifest |
+| `tmp/` | Build artifacts |
 
 ## Local Plugin Testing
 
@@ -51,10 +63,9 @@ To verify end-to-end logging:
 # 1. Install the plugin (use :latest or :latest-arm64)
 docker plugin install baraverkstad/journald-plus
 
-# 2. Start a container using the plugin
-docker run --rm --log-driver baraverkstad/journald-plus --log-opt tag=test alpine \
-  sh -c 'echo "Line 1"; echo "  continuation"; echo "ERROR: failing task"'
+# 2. Run test scenarios
+docker run --rm -i --log-driver baraverkstad/journald-plus --log-opt tag=test alpine:latest sh < test/test-logging.sh
 
-# 3. Check journald for the results
-journalctl -t test -o json-pretty -n 1
+# 3. Verify journald output
+sh test/verify-journal.sh
 ```
