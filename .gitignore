@@ -9,5 +9,4 @@ tmp/
 .vscode/
 
 # Agent
-.agent/memory/conversation-*
 .claude/settings.local.json
