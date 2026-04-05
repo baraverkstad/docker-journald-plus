@@ -236,8 +236,6 @@ matching log level words like ERROR or WARN.
 | `json-skip-keys` | _(none)_ | Comma-separated list of JSON keys to ignore entirely (not extracted, not stored). |
 | `json-extra` | `fields` | What to do with remaining JSON fields after extraction. `fields` stores them as `JSON_*` journal fields; `inline` appends them as raw JSON to the message. |
 
-> `parse-json` is a deprecated alias for `json-parse` and will continue to work.
-
 When `json-parse=true`, the driver attempts to parse each log line as a JSON object:
 
 1. **Level extraction** -- Checks `json-level-keys` (in order) and maps the value to a syslog priority
