@@ -6,11 +6,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"sync"
 	"syscall"
 	"time"
-
-	"github.com/containerd/fifo"
 )
 
 // Driver implements the Docker log driver plugin protocol.
@@ -111,7 +110,7 @@ func (d *Driver) handleStartLogging(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
 
-	f, err := fifo.OpenFifo(ctx, req.File, syscall.O_RDONLY, 0)
+	f, err := os.OpenFile(req.File, os.O_RDONLY|syscall.O_NONBLOCK, os.ModeNamedPipe)
 	if err != nil {
 		cancel()
 		respondErr(w, fmt.Errorf("opening fifo %s: %w", req.File, err))
