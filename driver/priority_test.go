@@ -68,7 +68,7 @@ func TestDetectPriorityPatternMatch(t *testing.T) {
 		{"WARN disk low", "stdout", PriWarning},
 		{"[Warning] slow query", "stdout", PriWarning},
 		{"CRITICAL overload", "stdout", PriCrit},
-		{"[Note] schema change", "stdout", PriNotice},
+		{"[Note] schema change", "stdout", PriInfo},
 		{"DEBUG trace", "stdout", PriDebug},
 		{"[Debug] dump", "stdout", PriDebug},
 	}
@@ -129,7 +129,7 @@ func TestDetectPriorityWithPrefix(t *testing.T) {
 		wantPri Priority
 	}{
 		// MariaDB style: timestamp stripped but numeric prefix remains
-		{" 0 [Note] InnoDB: Buffer pool size", "stdout", PriNotice},
+		{" 0 [Note] InnoDB: Buffer pool size", "stdout", PriInfo},
 		{" 1 [Warning] InnoDB: Disk full", "stdout", PriWarning},
 		{" 0 [ERROR] Connection refused", "stdout", PriErr},
 

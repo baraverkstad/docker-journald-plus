@@ -186,7 +186,7 @@ Note: In JSON, backslashes must be escaped (`\\d` instead of `\d`).
 | `priority-match-crit` | `^.{0,30}(CRITICAL\|\[Critical\])` | Regex: if the first line matches, set priority to CRIT (2). Allows up to 30 chars prefix. |
 | `priority-match-err` | `^.{0,30}(ERROR\|FATAL\|\[ERROR\]\|\[Fatal\])` | Regex: if the first line matches, set priority to ERR (3). Allows up to 30 chars prefix. |
 | `priority-match-warning` | `^.{0,30}(WARN\|WARNING\|\[Warning\])` | Regex: if the first line matches, set priority to WARNING (4). Allows up to 30 chars prefix. |
-| `priority-match-notice` | `^.{0,30}\[Note\]` | Regex: if the first line matches, set priority to NOTICE (5). Allows up to 30 chars prefix. |
+| `priority-match-notice` | *(none)* | Regex: if the first line matches, set priority to NOTICE (5). |
 | `priority-match-info` | *(none)* | Regex: if the first line matches, set priority to INFO (6). |
 | `priority-match-debug` | `^.{0,30}(DEBUG\|\[Debug\])` | Regex: if the first line matches, set priority to DEBUG (7). Allows up to 30 chars prefix. |
 
@@ -210,8 +210,8 @@ these values: `emerg`, `alert`, `crit`, `err`, `warning`, `notice`, `info`, `deb
 When enabled, timestamps are stripped **before** priority detection. The default
 priority patterns allow up to 30 characters prefix, which handles cases where
 timestamp stripping leaves behind other prefixes. For example, MariaDB logs like
-`2026-02-15 15:15:16 0 [Note] InnoDB:...` become ` 0 [Note] InnoDB:...` after
-timestamp stripping, and the `[Note]` pattern will still match.
+`2026-02-15 15:15:16 0 [Warning] InnoDB:...` become `0 [Warning] InnoDB:...` after
+timestamp stripping, and the `[Warning]` pattern will still match.
 
 Built-in patterns recognize these formats:
 

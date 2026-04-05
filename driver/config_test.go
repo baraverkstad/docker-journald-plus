@@ -65,7 +65,7 @@ func TestParseConfigDefaults(t *testing.T) {
 	for _, m := range cfg.PriorityMatchers {
 		found[m.Priority] = true
 	}
-	for _, pri := range []Priority{PriCrit, PriErr, PriWarning, PriNotice, PriDebug} {
+	for _, pri := range []Priority{PriCrit, PriErr, PriWarning, PriDebug} {
 		if !found[pri] {
 			t.Errorf("missing default matcher for priority %d", pri)
 		}
@@ -91,7 +91,6 @@ func TestParseConfigDefaultMatchers(t *testing.T) {
 		{"[Warning] slow query", PriWarning},
 		{"CRITICAL failure", PriCrit},
 		{"[Critical] overload", PriCrit},
-		{"[Note] schema updated", PriNotice},
 		{"DEBUG tracing", PriDebug},
 		{"[Debug] variable dump", PriDebug},
 	}
