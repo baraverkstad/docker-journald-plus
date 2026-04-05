@@ -4,7 +4,7 @@ VER     := $(if $(VERSION),$(patsubst v%,%,$(VERSION)),$(shell date '+%Y.%m.%d')
 REPO    := baraverkstad/journald-plus
 TAG     := $(or $(VERSION),latest)
 
-.PHONY: all clean build test publish
+.PHONY: all clean build test outdated publish
 
 all:
 	@echo '🌈 Makefile commands'
@@ -27,6 +27,18 @@ test:
 	go vet ./...
 	@test -z "$$(gofmt -l .)" || (echo "Formatting issues in: $$(gofmt -l . | xargs)"; exit 1)
 	go test ./...
+
+# List outdated dependencies and code modernizations
+outdated:
+	@echo --== go toolchain ==--
+	@echo "current: $$(go env GOVERSION)"
+	@echo "latest:  $$(curl -sf 'https://go.dev/VERSION?m=text' | head -1)"
+	@echo
+	@echo --== go dependencies ==--
+	@go list -u -m all
+	@echo
+	@echo --== go modernizations ==--
+	@go fix -diff ./...
 
 define publish-arch
 	@echo "📦 Building linux/$(1)..."

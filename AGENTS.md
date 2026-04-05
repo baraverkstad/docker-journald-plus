@@ -2,10 +2,10 @@
 *Pure-Go Docker log driver for journald with multiline merging and priority parsing.*
 
 ## References
-- [README.md] for features, installation, and usage documentation
-- [DEVELOPMENT.md] for build, test, and release workflow
-- [Makefile] — run `make` to list available targets
-- [.github/workflows/] — GitHub Actions publishes to Docker Hub (`baraverkstad/journald-plus`)
+- [README.md] — features, installation, documentation
+- [DEVELOPMENT.md] — detailed build, test, and release workflow
+- [Makefile] — canonical build tool (see below)
+- [.github/workflows/] — GitHub Actions publish to Docker Hub (`baraverkstad/journald-plus`)
 
 ## Goals & Ethos
 - Radical brevity
@@ -16,13 +16,14 @@
 ## Code Style
 - **Comments:** explain *why*, not *what*; only for exported APIs or non-obvious logic
 - **Variables:** short but descriptive; 1–2 chars for loops and iteration
+- **Go version:** current 1.26; update `go.mod`, `Dockerfile`, and GitHub Actions together; run `make outdated` after
 
 ## Constraints
 - **No CGO** — pure Go only
 - **No `gogo/protobuf`** — use internal decoder
 - **No `ReadLogs`** — users read via `journalctl`
 - **No crash** — log drivers must survive all errors
-- **Separate arch tags** — plugin limitations prevent true multi-arch manifests; publish `:latest-amd64`, `:latest-arm64` etc.
+- **Arch tags** — plugins cannot have multi-arch manifests; publish as `:<ver>-amd64`, `:<ver>-arm64` etc.
 
 ## Design Notes
 - **Architecture**: Docker v2 managed plugin; writes structured log entries to host journald socket.
@@ -37,6 +38,6 @@
 ## Build & Test
 ```
 make                    # show available targets
-make build test         # build and test (works on macOS)
-make publish            # cross-platform plugin build and push (Linux only)
+make build test         # build and test
+make outdated           # list outdated dependencies and code modernizations
 ```
