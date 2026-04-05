@@ -4,7 +4,7 @@
 ## References
 - [README.md] — features, installation, documentation
 - [DEVELOPMENT.md] — detailed build, test, and release workflow
-- [Makefile] — canonical build tool (see below)
+- [Makefile] — canonical build tool
 - [.github/workflows/] — GitHub Actions publish to Docker Hub (`baraverkstad/journald-plus`)
 
 ## Goals & Ethos
@@ -16,7 +16,6 @@
 ## Code Style
 - **Comments:** explain *why*, not *what*; only for exported APIs or non-obvious logic
 - **Variables:** short but descriptive; 1–2 chars for loops and iteration
-- **Go version:** current 1.26; update `go.mod`, `Dockerfile`, and GitHub Actions together; run `make outdated` after
 
 ## Constraints
 - **No CGO** — pure Go only
@@ -35,9 +34,16 @@
 - **JSON extraction**: Zero overhead when disabled (single boolean check); invalid JSON falls back to raw text
 - **Testing**: Inject `SendFunc` for isolated unit tests without a live journald socket
 
-## Build & Test
+## Workflow
+- **Builds** — use `make build` over `go build`
+- **Unit Tests** — use `make build test` over `go test`, even for single tests (fast enough)
+- **Conformance Tests** — check if `README` affected by change, suggest relevant manual tests to user
+- **Version Bumps** — update `go.mod`, `Dockerfile`, and GitHub Actions together; run `make outdated` after
+- **Writing Examples:** always verify runtime behavior against the source or command output
+
+## Command Reference
 ```
-make                    # show available targets
+make                    # list top-level make targets
 make build test         # build and test
 make outdated           # list outdated dependencies and code modernizations
 ```
