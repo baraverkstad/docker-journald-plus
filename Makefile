@@ -55,7 +55,4 @@ endef
 publish: clean
 	$(call publish-arch,amd64)
 	$(call publish-arch,arm64)
-	docker plugin create $(REPO):$(TAG) tmp/plugin-amd64
-	docker plugin push $(REPO):$(TAG)
-	docker plugin rm $(REPO):$(TAG)
-	@echo "✅ Published $(REPO):{$(TAG),$(TAG)-amd64,$(TAG)-arm64}"
+	@echo "✅ Published $(REPO):{$(TAG)-amd64,$(TAG)-arm64}"
