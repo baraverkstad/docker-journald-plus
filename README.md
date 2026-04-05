@@ -6,6 +6,8 @@ priority parsing.
 Implemented as a Docker managed plugin (v2), installed via `docker plugin install`.
 Available on [Docker Hub](https://hub.docker.com/r/baraverkstad/journald-plus).
 
+Read more: https://github.com/baraverkstad/docker-journald-plus
+
 ## Features
 
 - **Multiline merging** -- consecutive log lines are merged into single journal
