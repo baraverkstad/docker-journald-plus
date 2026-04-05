@@ -21,7 +21,7 @@ func ParseJSONLog(cfg *Config, line []byte) (*JSONParsedLog, bool) {
 	}
 
 	// Try to unmarshal as JSON object
-	var obj map[string]interface{}
+	var obj map[string]any
 	if err := json.Unmarshal(line, &obj); err != nil {
 		return nil, false
 	}

@@ -167,7 +167,7 @@ func (d *Driver) handleCapabilities(w http.ResponseWriter, r *http.Request) {
 
 // logError rate-limits error logging to prevent log floods.
 // Logs at most 1 error per minute; suppressed errors are counted.
-func (lc *logConsumer) logError(format string, args ...interface{}) {
+func (lc *logConsumer) logError(format string, args ...any) {
 	lc.errMu.Lock()
 	defer lc.errMu.Unlock()
 

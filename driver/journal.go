@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"regexp"
 	"strings"
 	"text/template"
@@ -209,9 +210,7 @@ func (w *journalWriter) Write(msg mergedMessage, pri Priority, processedLine []b
 	vars := make(map[string]string, len(w.baseVars)+2+len(jsonFields)+len(extractedFields))
 
 	// Add base fields
-	for k, v := range w.baseVars {
-		vars[k] = v
-	}
+	maps.Copy(vars, w.baseVars)
 
 	// Add JSON fields with JSON_ prefix
 	if len(jsonFields) > 0 {
@@ -223,9 +222,7 @@ func (w *journalWriter) Write(msg mergedMessage, pri Priority, processedLine []b
 
 	// Add extracted fields (no prefix, user controls field name)
 	if len(extractedFields) > 0 {
-		for k, v := range extractedFields {
-			vars[k] = v
-		}
+		maps.Copy(vars, extractedFields)
 	}
 
 	// Add timestamp

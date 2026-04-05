@@ -171,9 +171,9 @@ func TestMultilineTimerRaceCondition(t *testing.T) {
 	m.AddLine([]byte("line 1"), "stdout", 1000)
 
 	// Rapidly add continuations to trigger timer resets
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		time.Sleep(5 * time.Millisecond)
-		m.AddLine([]byte(fmt.Sprintf("  cont %d", i)), "stdout", 2000+int64(i))
+		m.AddLine(fmt.Appendf(nil, "  cont %d", i), "stdout", 2000+int64(i))
 	}
 
 	// Wait less than timeout - should have 0 messages (no premature flush)

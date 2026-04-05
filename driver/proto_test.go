@@ -141,13 +141,13 @@ func TestDecodePartialEntry(t *testing.T) {
 
 func TestDecodeMultipleEntries(t *testing.T) {
 	var buf bytes.Buffer
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		msg := buildLogEntry("stdout", int64(i+1)*1000, "line", false)
 		buf.Write(wrapWithLength(msg))
 	}
 
 	dec := newLogEntryDecoder(&buf)
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		var entry logEntry
 		if err := dec.decode(&entry); err != nil {
 			t.Fatalf("decode entry %d: %v", i, err)
