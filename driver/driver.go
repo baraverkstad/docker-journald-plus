@@ -211,9 +211,13 @@ func (d *Driver) consumeLog(ctx context.Context, f io.ReadCloser, lc *logConsume
 			// JSON parsing succeeded
 			jsonFields = parsed.ExtraFields
 
-			// Use JSON message as log body
-			if parsed.Message != "" {
-				line = []byte(parsed.Message)
+			// Use JSON message as log body, appending inline JSON if present
+			msg := parsed.Message
+			if parsed.InlineJSON != "" {
+				msg = msg + " " + parsed.InlineJSON
+			}
+			if msg != "" {
+				line = []byte(msg)
 			}
 
 			// Detect priority from JSON level field

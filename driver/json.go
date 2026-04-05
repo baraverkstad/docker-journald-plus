@@ -10,7 +10,8 @@ import (
 type JSONParsedLog struct {
 	Level       string            // Extracted level/severity value
 	Message     string            // Extracted message body
-	ExtraFields map[string]string // Other fields to add as JSON_*
+	ExtraFields map[string]string // Other fields to add as JSON_* (when JSONExtraInline=false)
+	InlineJSON  string            // Remaining fields marshalled as JSON (when JSONExtraInline=true)
 }
 
 // ParseJSONLog attempts to parse a log line as JSON.
@@ -57,29 +58,41 @@ func ParseJSONLog(cfg *Config, line []byte) (*JSONParsedLog, bool) {
 		return nil, false
 	}
 
-	// Flatten remaining fields
-	for k, v := range obj {
-		// Convert value to string
-		var strVal string
-		switch val := v.(type) {
-		case string:
-			strVal = val
-		case float64:
-			strVal = formatFloat(val)
-		case bool:
-			strVal = formatBool(val)
-		case nil:
-			continue // Skip null values
-		default:
-			// For nested objects/arrays, marshal back to JSON string
-			if b, err := json.Marshal(val); err == nil {
-				strVal = string(b)
-			} else {
-				continue // Skip if can't marshal
+	// Remove skip keys before processing remaining fields
+	for _, key := range cfg.JSONSkipKeys {
+		delete(obj, key)
+	}
+
+	if cfg.JSONExtraInline {
+		// Marshal remaining fields as JSON and store for appending to message
+		if len(obj) > 0 {
+			if b, err := json.Marshal(obj); err == nil {
+				result.InlineJSON = string(b)
 			}
 		}
-
-		result.ExtraFields[k] = strVal
+	} else {
+		// Flatten remaining fields into journal-friendly key/value pairs
+		for k, v := range obj {
+			var strVal string
+			switch val := v.(type) {
+			case string:
+				strVal = val
+			case float64:
+				strVal = formatFloat(val)
+			case bool:
+				strVal = formatBool(val)
+			case nil:
+				continue // Skip null values
+			default:
+				// For nested objects/arrays, marshal back to JSON string
+				if b, err := json.Marshal(val); err == nil {
+					strVal = string(b)
+				} else {
+					continue // Skip if can't marshal
+				}
+			}
+			result.ExtraFields[k] = strVal
+		}
 	}
 
 	return result, true

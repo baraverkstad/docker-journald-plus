@@ -230,16 +230,21 @@ matching log level words like ERROR or WARN.
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `parse-json` | `false` | Parse log lines as JSON objects and extract structured fields. |
+| `json-parse` | `false` | Parse log lines as JSON objects and extract structured fields. |
 | `json-level-keys` | `level,severity,log_level` | Comma-separated list of JSON keys to check for log level/priority (first match wins). |
 | `json-message-keys` | `message,msg,log` | Comma-separated list of JSON keys to extract as the message body (first match wins). |
+| `json-skip-keys` | _(none)_ | Comma-separated list of JSON keys to ignore entirely (not extracted, not stored). |
+| `json-extra` | `fields` | What to do with remaining JSON fields after extraction. `fields` stores them as `JSON_*` journal fields; `inline` appends them as raw JSON to the message. |
 
-When `parse-json=true`, the driver attempts to parse each log line as a JSON object:
+> `parse-json` is a deprecated alias for `json-parse` and will continue to work.
+
+When `json-parse=true`, the driver attempts to parse each log line as a JSON object:
 
 1. **Level extraction** -- Checks `json-level-keys` (in order) and maps the value to a syslog priority
 2. **Message extraction** -- Checks `json-message-keys` (in order) and uses the value as MESSAGE
-3. **Field flattening** -- Remaining fields are added to journald with `JSON_` prefix
-4. **Graceful fallback** -- If parsing fails or no message key is found, the original line is used
+3. **Skip keys** -- Keys in `json-skip-keys` are discarded
+4. **Remaining fields** -- Stored as `JSON_*` journal fields (`json-extra=fields`) or appended to the message as JSON (`json-extra=inline`); ignored if empty
+5. **Graceful fallback** -- If parsing fails or no message key is found, the original line is used
 
 **Supported level mappings:**
 
@@ -261,7 +266,7 @@ Level strings are case-insensitive.
 Basic usage with default keys:
 ```bash
 docker run --log-driver baraverkstad/journald-plus:[VER] \
-  --log-opt parse-json=true \
+  --log-opt json-parse=true \
   myapp
 ```
 
@@ -285,7 +290,7 @@ journalctl -p err  # Show all ERROR and above
 Custom key names for non-standard JSON formats:
 ```bash
 docker run --log-driver baraverkstad/journald-plus:[VER] \
-  --log-opt parse-json=true \
+  --log-opt json-parse=true \
   --log-opt json-level-keys='lvl,severity' \
   --log-opt json-message-keys='text,body' \
   myapp
@@ -302,6 +307,28 @@ Results in:
 - `JSON_TRACE_ID=a1b2c3`
 - `JSON_SPAN_ID=x9y8z7`
 - `JSON_DURATION_MS=42.5`
+
+Skip noisy fields (e.g. high-cardinality timestamps already in the journald entry):
+```bash
+docker run --log-driver baraverkstad/journald-plus:[VER] \
+  --log-opt json-parse=true \
+  --log-opt json-skip-keys='ts,time,@timestamp' \
+  myapp
+```
+
+Keep remaining fields inline in the message rather than as journal fields:
+```bash
+docker run --log-driver baraverkstad/journald-plus:[VER] \
+  --log-opt json-parse=true \
+  --log-opt json-extra=inline \
+  myapp
+```
+
+Input: `{"level":"info","message":"request handled","request_id":"abc","duration_ms":12}`
+
+Results in:
+- `MESSAGE=request handled {"request_id":"abc","duration_ms":12}`
+- `PRIORITY=6` (INFO)
 
 **Notes:**
 - Field names are sanitized for journald compatibility (uppercase, special chars replaced with `_`)

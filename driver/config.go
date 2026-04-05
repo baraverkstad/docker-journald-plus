@@ -63,6 +63,8 @@ type Config struct {
 	ParseJSON       bool
 	JSONLevelKeys   []string // Keys to check for level/severity
 	JSONMessageKeys []string // Keys to check for message body
+	JSONSkipKeys    []string // Keys to ignore entirely
+	JSONExtraInline bool     // false=journal fields (default), true=append remaining JSON to message
 
 	// Field extraction
 	FieldExtractors []fieldExtractor // Regex patterns to extract custom fields
@@ -107,9 +109,12 @@ var knownOpts = map[string]bool{
 	"strip-timestamp":       true,
 	"strip-timestamp-regex": true,
 
-	"parse-json":        true,
+	"json-parse":        true,
+	"parse-json":        true, // deprecated alias for json-parse
 	"json-level-keys":   true,
 	"json-message-keys": true,
+	"json-skip-keys":    true,
+	"json-extra":        true,
 }
 
 // ParseConfig validates and parses a map of log-opt key/value pairs.
@@ -294,13 +299,16 @@ func ParseConfig(opts map[string]string) (*Config, error) {
 		}
 	}
 
-	// Parse JSON options
-	if v, ok := opts["parse-json"]; ok {
-		b, err := strconv.ParseBool(v)
-		if err != nil {
-			return nil, fmt.Errorf("invalid parse-json %q: must be true or false", v)
+	// JSON parsing on/off; json-parse is canonical, parse-json is the legacy alias
+	for _, key := range []string{"json-parse", "parse-json"} {
+		if v, ok := opts[key]; ok {
+			b, err := strconv.ParseBool(v)
+			if err != nil {
+				return nil, fmt.Errorf("invalid %s %q: must be true or false", key, v)
+			}
+			cfg.ParseJSON = b
+			break // json-parse checked first; once found, stop
 		}
-		cfg.ParseJSON = b
 	}
 
 	// JSON level keys (comma-separated, defaults to "level,severity,log_level")
@@ -321,6 +329,26 @@ func ParseConfig(opts map[string]string) (*Config, error) {
 		}
 	} else {
 		cfg.JSONMessageKeys = []string{"message", "msg", "log"}
+	}
+
+	// JSON skip keys (comma-separated; empty = skip nothing)
+	if v, ok := opts["json-skip-keys"]; ok && v != "" {
+		cfg.JSONSkipKeys = strings.Split(v, ",")
+		for i := range cfg.JSONSkipKeys {
+			cfg.JSONSkipKeys[i] = strings.TrimSpace(cfg.JSONSkipKeys[i])
+		}
+	}
+
+	// JSON extra: where remaining fields go (fields=journal entries, inline=append to message)
+	if v, ok := opts["json-extra"]; ok {
+		switch v {
+		case "fields", "":
+			cfg.JSONExtraInline = false
+		case "inline":
+			cfg.JSONExtraInline = true
+		default:
+			return nil, fmt.Errorf("invalid json-extra %q: must be \"fields\" or \"inline\"", v)
+		}
 	}
 
 	// Field extractors (field-FIELDNAME options)
