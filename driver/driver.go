@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/containerd/fifo"
-	"github.com/docker/go-plugins-helpers/sdk"
 )
 
 // Driver implements the Docker log driver plugin protocol.
@@ -48,10 +47,10 @@ func NewWithSendFunc(sendFn JournalSendFunc) *Driver {
 }
 
 // RegisterHandlers wires up the HTTP endpoints on the plugin handler.
-func (d *Driver) RegisterHandlers(h sdk.Handler) {
-	h.HandleFunc("/LogDriver.StartLogging", d.handleStartLogging)
-	h.HandleFunc("/LogDriver.StopLogging", d.handleStopLogging)
-	h.HandleFunc("/LogDriver.Capabilities", d.handleCapabilities)
+func (d *Driver) RegisterHandlers(mux *http.ServeMux) {
+	mux.HandleFunc("/LogDriver.StartLogging", d.handleStartLogging)
+	mux.HandleFunc("/LogDriver.StopLogging", d.handleStopLogging)
+	mux.HandleFunc("/LogDriver.Capabilities", d.handleCapabilities)
 }
 
 // --- Request/Response types ---
