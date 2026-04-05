@@ -4,6 +4,7 @@ A Docker journald log driver plugin that adds multiline message merging and log
 priority parsing.
 
 Implemented as a Docker managed plugin (v2), installed via `docker plugin install`.
+Available on [Docker Hub](https://hub.docker.com/r/baraverkstad/journald-plus).
 
 ## Features
 
@@ -19,15 +20,51 @@ Implemented as a Docker managed plugin (v2), installed via `docker plugin instal
 
 ## Installation
 
+Docker plugins do not support multi-arch manifest lists, so there is no single
+tag that auto-selects the right architecture. Instead, install the arch-specific
+tag and assign it a local alias that your configuration will reference:
+
 ```bash
-docker plugin install baraverkstad/journald-plus:latest
+ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
+docker plugin install baraverkstad/journald-plus:[VER]-$ARCH \
+  --alias baraverkstad/journald-plus:[VER]
 ```
+
+The `--alias` name (`baraverkstad/journald-plus:[VER]`) is what you put in
+`daemon.json`, `compose.yml`, or `--log-driver`. Never reference the underlying
+arch tag directly in config — only the alias is portable across machines.
+
+> **Note:** No `latest` tag is published. Use an arch-specific tag
+> (`latest-amd64`, `latest-arm64`) if you need the latest build without a
+> version alias, or prefer a versioned alias as shown above.
+
+## Upgrading
+
+A plugin that is in use by running containers cannot be disabled or upgraded
+in-place. The versioned alias pattern lets two plugin versions coexist so you
+can migrate services one at a time with no downtime:
+
+1. Install the new version under a new alias:
+   ```bash
+   ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
+   docker plugin install baraverkstad/journald-plus:[NEXT]-$ARCH \
+     --alias baraverkstad/journald-plus:[NEXT]
+   ```
+2. Update `daemon.json` or `compose.yml` to reference the new alias
+   (`baraverkstad/journald-plus:[NEXT]`).
+3. If using `daemon.json`, restart `dockerd` to pick up the new default driver.
+4. Recreate services to use the new alias one at a time.
+5. Once no containers reference the old alias, remove it:
+   ```bash
+   docker plugin disable baraverkstad/journald-plus:[VER]
+   docker plugin rm baraverkstad/journald-plus:[VER]
+   ```
 
 ## Usage
 
 ```bash
 docker run --name myapp \
-  --log-driver baraverkstad/journald-plus \
+  --log-driver baraverkstad/journald-plus:[VER] \
   --log-opt strip-timestamp=true \
   myimage
 ```
@@ -39,7 +76,7 @@ services:
   app:
     image: myapp:latest
     logging:
-      driver: baraverkstad/journald-plus
+      driver: baraverkstad/journald-plus:[VER]
       options:
         strip-timestamp: "true"
 ```
@@ -48,7 +85,7 @@ Or set as default in `/etc/docker/daemon.json`:
 
 ```json
 {
-  "log-driver": "baraverkstad/journald-plus",
+  "log-driver": "baraverkstad/journald-plus:[VER]",
   "log-opts": {
     "strip-timestamp": "true"
   }
@@ -115,7 +152,7 @@ journalctl USER_ID=42
 In `/etc/docker/daemon.json`:
 ```json
 {
-  "log-driver": "baraverkstad/journald-plus",
+  "log-driver": "baraverkstad/journald-plus:[VER]",
   "log-opts": {
     "field-REQUEST_ID": "request_id=([a-z0-9]+)",
     "field-USER_ID": "user=(\\d+)"
@@ -223,7 +260,7 @@ Level strings are case-insensitive.
 
 Basic usage with default keys:
 ```bash
-docker run --log-driver baraverkstad/journald-plus \
+docker run --log-driver baraverkstad/journald-plus:[VER] \
   --log-opt parse-json=true \
   myapp
 ```
@@ -247,7 +284,7 @@ journalctl -p err  # Show all ERROR and above
 
 Custom key names for non-standard JSON formats:
 ```bash
-docker run --log-driver baraverkstad/journald-plus \
+docker run --log-driver baraverkstad/journald-plus:[VER] \
   --log-opt parse-json=true \
   --log-opt json-level-keys='lvl,severity' \
   --log-opt json-message-keys='text,body' \
