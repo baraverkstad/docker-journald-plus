@@ -227,8 +227,8 @@ func TestParseConfigJSONParseBackwardsCompat(t *testing.T) {
 
 func TestParseConfigJSONSkipKeys(t *testing.T) {
 	cfg, err := ParseConfig(map[string]string{
-		"json-parse":      "true",
-		"json-skip-keys":  "ts,time,@timestamp",
+		"json-parse":     "true",
+		"json-skip-keys": "ts,time,@timestamp",
 	})
 	if err != nil {
 		t.Fatalf("ParseConfig: %v", err)
