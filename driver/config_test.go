@@ -193,7 +193,7 @@ func TestParseConfigRejectsUnknown(t *testing.T) {
 
 func TestParseConfigJSONOptions(t *testing.T) {
 	cfg, err := ParseConfig(map[string]string{
-		"parse-json":        "true",
+		"json-parse":        "true",
 		"json-level-keys":   "lvl,severity",
 		"json-message-keys": "text,body",
 	})
@@ -211,6 +211,73 @@ func TestParseConfigJSONOptions(t *testing.T) {
 
 	if len(cfg.JSONMessageKeys) != 2 || cfg.JSONMessageKeys[0] != "text" || cfg.JSONMessageKeys[1] != "body" {
 		t.Errorf("JSONMessageKeys = %v, want [text body]", cfg.JSONMessageKeys)
+	}
+}
+
+func TestParseConfigJSONParseBackwardsCompat(t *testing.T) {
+	// parse-json must still be accepted for backwards compatibility
+	cfg, err := ParseConfig(map[string]string{"parse-json": "true"})
+	if err != nil {
+		t.Fatalf("ParseConfig: %v", err)
+	}
+	if !cfg.ParseJSON {
+		t.Error("ParseJSON should be true via legacy parse-json option")
+	}
+}
+
+func TestParseConfigJSONSkipKeys(t *testing.T) {
+	cfg, err := ParseConfig(map[string]string{
+		"json-parse":      "true",
+		"json-skip-keys":  "ts,time,@timestamp",
+	})
+	if err != nil {
+		t.Fatalf("ParseConfig: %v", err)
+	}
+	if len(cfg.JSONSkipKeys) != 3 {
+		t.Fatalf("JSONSkipKeys = %v, want [ts time @timestamp]", cfg.JSONSkipKeys)
+	}
+	if cfg.JSONSkipKeys[0] != "ts" || cfg.JSONSkipKeys[1] != "time" || cfg.JSONSkipKeys[2] != "@timestamp" {
+		t.Errorf("JSONSkipKeys = %v, want [ts time @timestamp]", cfg.JSONSkipKeys)
+	}
+}
+
+func TestParseConfigJSONSkipKeysWithSpaces(t *testing.T) {
+	cfg, err := ParseConfig(map[string]string{
+		"json-skip-keys": " ts , time ",
+	})
+	if err != nil {
+		t.Fatalf("ParseConfig: %v", err)
+	}
+	if len(cfg.JSONSkipKeys) != 2 || cfg.JSONSkipKeys[0] != "ts" || cfg.JSONSkipKeys[1] != "time" {
+		t.Errorf("JSONSkipKeys = %v, want [ts time]", cfg.JSONSkipKeys)
+	}
+}
+
+func TestParseConfigJSONExtra(t *testing.T) {
+	cfg, err := ParseConfig(map[string]string{"json-extra": "fields"})
+	if err != nil {
+		t.Fatalf("ParseConfig: %v", err)
+	}
+	if cfg.JSONExtraInline {
+		t.Error("JSONExtraInline should be false for json-extra=fields")
+	}
+
+	cfg, err = ParseConfig(map[string]string{"json-extra": "inline"})
+	if err != nil {
+		t.Fatalf("ParseConfig: %v", err)
+	}
+	if !cfg.JSONExtraInline {
+		t.Error("JSONExtraInline should be true for json-extra=inline")
+	}
+}
+
+func TestParseConfigJSONExtraDefault(t *testing.T) {
+	cfg, err := ParseConfig(nil)
+	if err != nil {
+		t.Fatalf("ParseConfig: %v", err)
+	}
+	if cfg.JSONExtraInline {
+		t.Error("JSONExtraInline should default to false")
 	}
 }
 
@@ -250,6 +317,8 @@ func TestParseConfigRejectsInvalid(t *testing.T) {
 		{"bad labels-regex", map[string]string{"labels-regex": "[broken"}},
 		{"bad env-regex", map[string]string{"env-regex": "[broken"}},
 		{"bad parse-json", map[string]string{"parse-json": "maybe"}},
+		{"bad json-parse", map[string]string{"json-parse": "maybe"}},
+		{"bad json-extra", map[string]string{"json-extra": "invalid"}},
 		{"field extractor no capture group", map[string]string{"field-REQUEST_ID": "request_id=[a-z0-9]+"}},
 		{"field extractor bad regex", map[string]string{"field-USER_ID": "[invalid"}},
 		{"field extractor empty name", map[string]string{"field-": "pattern"}},

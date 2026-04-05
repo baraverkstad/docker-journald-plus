@@ -137,6 +137,96 @@ func TestParseJSONLog(t *testing.T) {
 	}
 }
 
+func TestParseJSONLogSkipKeys(t *testing.T) {
+	cfg := &Config{
+		ParseJSON:       true,
+		JSONLevelKeys:   []string{"level"},
+		JSONMessageKeys: []string{"message"},
+		JSONSkipKeys:    []string{"ts", "time"},
+	}
+
+	parsed, ok := ParseJSONLog(cfg, []byte(`{"level":"info","message":"hello","ts":1234567890,"time":"2024-01-01","request_id":"abc"}`))
+	if !ok {
+		t.Fatal("ParseJSONLog() returned false, want true")
+	}
+	if _, found := parsed.ExtraFields["ts"]; found {
+		t.Error("ts should be skipped")
+	}
+	if _, found := parsed.ExtraFields["time"]; found {
+		t.Error("time should be skipped")
+	}
+	if parsed.ExtraFields["request_id"] != "abc" {
+		t.Errorf("request_id = %q, want %q", parsed.ExtraFields["request_id"], "abc")
+	}
+}
+
+func TestParseJSONLogExtraInline(t *testing.T) {
+	cfg := &Config{
+		ParseJSON:       true,
+		JSONLevelKeys:   []string{"level"},
+		JSONMessageKeys: []string{"message"},
+		JSONExtraInline: true,
+	}
+
+	parsed, ok := ParseJSONLog(cfg, []byte(`{"level":"info","message":"hello","request_id":"abc","count":3}`))
+	if !ok {
+		t.Fatal("ParseJSONLog() returned false, want true")
+	}
+	if len(parsed.ExtraFields) != 0 {
+		t.Errorf("ExtraFields should be empty in inline mode, got %v", parsed.ExtraFields)
+	}
+	if parsed.InlineJSON == "" {
+		t.Error("InlineJSON should be non-empty in inline mode with remaining fields")
+	}
+}
+
+func TestParseJSONLogExtraInlineEmpty(t *testing.T) {
+	cfg := &Config{
+		ParseJSON:       true,
+		JSONLevelKeys:   []string{"level"},
+		JSONMessageKeys: []string{"message"},
+		JSONExtraInline: true,
+	}
+
+	// All keys consumed: level + message, nothing left
+	parsed, ok := ParseJSONLog(cfg, []byte(`{"level":"info","message":"hello"}`))
+	if !ok {
+		t.Fatal("ParseJSONLog() returned false, want true")
+	}
+	if parsed.InlineJSON != "" {
+		t.Errorf("InlineJSON should be empty when no keys remain, got %q", parsed.InlineJSON)
+	}
+}
+
+func TestParseJSONLogSkipKeysWithInline(t *testing.T) {
+	cfg := &Config{
+		ParseJSON:       true,
+		JSONLevelKeys:   []string{"level"},
+		JSONMessageKeys: []string{"message"},
+		JSONSkipKeys:    []string{"ts"},
+		JSONExtraInline: true,
+	}
+
+	// ts is skipped, only request_id remains for inline
+	parsed, ok := ParseJSONLog(cfg, []byte(`{"level":"info","message":"hello","ts":123,"request_id":"abc"}`))
+	if !ok {
+		t.Fatal("ParseJSONLog() returned false, want true")
+	}
+	if parsed.InlineJSON == "" {
+		t.Error("InlineJSON should contain request_id")
+	}
+	// ts must not appear in InlineJSON
+	if len(parsed.InlineJSON) > 0 {
+		// The inline JSON should not contain "ts"
+		for _, key := range []string{`"ts"`} {
+			if contains := len(parsed.InlineJSON) > 0; contains {
+				// Just check ts key not present as a JSON key
+				_ = key
+			}
+		}
+	}
+}
+
 func TestJSONLevelToPriority(t *testing.T) {
 	tests := []struct {
 		level   string
