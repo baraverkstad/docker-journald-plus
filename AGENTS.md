@@ -3,6 +3,7 @@
 
 ## References
 - [README.md] — features, installation, documentation
+- [CHANGELOG.md] — user-facing changes by version
 - [DEVELOPMENT.md] — detailed build, test, and release workflow
 - [Makefile] — canonical build tool
 - [.github/workflows/] — GitHub Actions publish to Docker Hub (`baraverkstad/journald-plus`)
@@ -37,7 +38,7 @@
 ## Workflow
 - **Builds** — use `make build` over `go build`
 - **Unit Tests** — use `make build test` over `go test`, even for single tests (fast enough)
-- **Conformance Tests** — check if `README` affected by change, suggest relevant manual tests to user
+- **Conformance Tests** — check if `README.md` or `CHANGELOG.md` affected by change, suggest relevant manual tests to user
 - **Version Bumps** — update `go.mod`, `Dockerfile`, and GitHub Actions together; run `make outdated` after
 - **Writing Examples:** always verify runtime behavior against the source or command output
 
