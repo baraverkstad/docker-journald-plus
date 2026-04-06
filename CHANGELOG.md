@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Fixed timestamp stripping for single-digit hours (e.g. `2026-02-21 6:36:00`)
+- [Commit list](https://github.com/baraverkstad/docker-journald-plus/compare/v0.5...HEAD)
+
 ## v0.5 - 2026-04-06
 
 - Fixed timestamp parsing of space-separated timezone offsets

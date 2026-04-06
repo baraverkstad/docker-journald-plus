@@ -36,6 +36,8 @@ func TestStripTimestampISO8601(t *testing.T) {
 		{"CET suffix (partial strip)", "2024-01-15 10:30:45.123 CET ERROR something", "CET ERROR something"},
 		{"space separator", "2024-01-15 10:30:45 ERROR something", "ERROR something"},
 		{"space before tz", "2026-04-05 00:02:16 +0000 DEBUG something", "DEBUG something"},
+		{"double space single-digit hour", "2026-02-21  6:36:00 INFO something", "INFO something"},
+		{"single space single-digit hour", "2026-02-21 6:36:00 INFO something", "INFO something"},
 		{"bracketed", "[2024-01-15 10:30:45] ERROR something", "ERROR something"},
 		{"dash separator", "2024-01-15T10:30:45 - ERROR something", "ERROR something"},
 		{"pipe separator", "2024-01-15T10:30:45 | ERROR something", "ERROR something"},

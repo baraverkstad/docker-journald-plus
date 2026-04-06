@@ -15,10 +15,11 @@ var defaultTimestampPatterns = []string{
 	//   2024-01-15 10:30:45,123 UTC
 	//   2024-01-15 10:30:45 +0000
 	//   2024-01-15 10:30:45
+	//   2024-01-15  6:36:00  (double space or single-digit hour)
 	// Covers: Log4j2, Logback, Python, Ruby, MySQL 5.7+, PostgreSQL, Docker
 	// Note: timezone abbreviations limited to Z/UTC/GMT to avoid matching
 	// log level words like ERROR, WARN, INFO, DEBUG.
-	`^\[?\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}([.,]\d{1,9})?(\s?(Z|[+-]\d{2}:?\d{2}))?(\s+(UTC|GMT))?\]?`,
+	`^\[?\d{4}-\d{2}-\d{2}[T ][\d ]?\d:\d{2}:\d{2}([.,]\d{1,9})?(\s?(Z|[+-]\d{2}:?\d{2}))?(\s+(UTC|GMT))?\]?`,
 
 	// Go log / nginx error: 2024/01/15 10:30:45 or 2024/01/15 10:30:45.000000
 	`^\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}(\.\d{1,6})?`,
