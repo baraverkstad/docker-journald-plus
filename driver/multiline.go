@@ -8,10 +8,9 @@ import (
 
 // mergedMessage is a complete message after multiline merging.
 type mergedMessage struct {
-	Line       []byte
-	Source     string
-	TimeNano   int64
-	JSONFields map[string]string // Extracted JSON fields (nil if not JSON)
+	Line     []byte
+	Source   string
+	TimeNano int64
 }
 
 // multilineMerger buffers and merges consecutive continuation lines.

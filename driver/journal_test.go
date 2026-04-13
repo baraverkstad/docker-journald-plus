@@ -5,6 +5,33 @@ import (
 	"testing"
 )
 
+func TestSanitizeFieldName(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"request_id", "REQUEST_ID"},
+		{"user-name", "USER_NAME"},
+		{"http.method", "HTTP_METHOD"},
+		{"123field", "_123FIELD"},
+		{"MixedCase", "MIXEDCASE"},
+		{"with spaces", "WITH_SPACES"},
+		{"special!@#chars", "SPECIAL___CHARS"},
+		{"_leading_underscore", "_LEADING_UNDERSCORE"},
+		{"ALREADY_UPPER", "ALREADY_UPPER"},
+		{"", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got := sanitizeFieldName(tt.input)
+			if got != tt.want {
+				t.Errorf("sanitizeFieldName(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestJournalWriterBaseVars(t *testing.T) {
 	cfg := mustConfig(t, map[string]string{
 		"labels": "app,version",

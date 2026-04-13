@@ -203,22 +203,17 @@ func sanitizeFieldName(name string) string {
 }
 
 // Write sends a log entry to journald with optional JSON-extracted fields.
-func (w *journalWriter) Write(msg mergedMessage, pri Priority, processedLine []byte, jsonFields map[string]string) error {
+func (w *journalWriter) Write(msg mergedMessage, pri Priority, processedLine []byte, fields map[string]string) error {
 	// Extract custom fields from the processed message
 	extractedFields := w.cfg.ExtractFields(string(processedLine))
 
-	vars := make(map[string]string, len(w.baseVars)+2+len(jsonFields)+len(extractedFields))
+	vars := make(map[string]string, len(w.baseVars)+2+len(fields)+len(extractedFields))
 
 	// Add base fields
 	maps.Copy(vars, w.baseVars)
 
-	// Add JSON fields with JSON_ prefix
-	if len(jsonFields) > 0 {
-		for k, v := range jsonFields {
-			fieldName := "JSON_" + sanitizeFieldName(k)
-			vars[fieldName] = v
-		}
-	}
+	// Add JSON fields
+	maps.Copy(vars, fields)
 
 	// Add extracted fields (no prefix, user controls field name)
 	if len(extractedFields) > 0 {

@@ -3,6 +3,7 @@ package driver
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 )
 
 // JSONParsedLog represents a successfully parsed JSON log line.
@@ -70,44 +71,39 @@ func ParseJSONLog(cfg *Config, line []byte) (*JSONParsedLog, bool) {
 			}
 		}
 	} else {
-		// Flatten remaining fields into journal-friendly key/value pairs
-		for k, v := range obj {
-			var strVal string
-			switch val := v.(type) {
-			case string:
-				strVal = val
-			case float64:
-				strVal = formatFloat(val)
-			case bool:
-				strVal = formatBool(val)
-			case nil:
-				continue // Skip null values
-			default:
-				// For nested objects/arrays, marshal back to JSON string
-				if b, err := json.Marshal(val); err == nil {
-					strVal = string(b)
-				} else {
-					continue // Skip if can't marshal
-				}
-			}
-			result.ExtraFields[k] = strVal
-		}
+		result.ExtraFields = flattenJSON(obj)
 	}
 
 	return result, true
 }
 
-func formatFloat(f float64) string {
-	// If integer, format without decimal
-	if f == float64(int64(f)) {
-		return fmt.Sprintf("%d", int64(f))
+// flattenJSON converts a JSON object into journal-friendly key/value pairs
+// with sanitized, JSON_-prefixed field names.
+func flattenJSON(obj map[string]any) map[string]string {
+	fields := make(map[string]string, len(obj))
+	for k, v := range obj {
+		var strVal string
+		switch val := v.(type) {
+		case string:
+			strVal = val
+		case float64:
+			if val == float64(int64(val)) {
+				strVal = fmt.Sprintf("%d", int64(val))
+			} else {
+				strVal = fmt.Sprintf("%g", val)
+			}
+		case bool:
+			strVal = strconv.FormatBool(val)
+		case nil:
+			continue
+		default:
+			if b, err := json.Marshal(val); err == nil {
+				strVal = string(b)
+			} else {
+				continue
+			}
+		}
+		fields["JSON_"+sanitizeFieldName(k)] = strVal
 	}
-	return fmt.Sprintf("%g", f)
-}
-
-func formatBool(b bool) string {
-	if b {
-		return "true"
-	}
-	return "false"
+	return fields
 }

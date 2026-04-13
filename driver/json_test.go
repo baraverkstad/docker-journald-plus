@@ -1,6 +1,7 @@
 package driver
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -25,7 +26,7 @@ func TestParseJSONLog(t *testing.T) {
 			wantOK:      true,
 			wantLevel:   "error",
 			wantMessage: "something failed",
-			wantFields:  map[string]string{"request_id": "123"},
+			wantFields:  map[string]string{"JSON_REQUEST_ID": "123"},
 		},
 		{
 			name:        "valid JSON with severity and msg (alternate keys)",
@@ -33,7 +34,7 @@ func TestParseJSONLog(t *testing.T) {
 			wantOK:      true,
 			wantLevel:   "warn",
 			wantMessage: "warning message",
-			wantFields:  map[string]string{"user_id": "456"},
+			wantFields:  map[string]string{"JSON_USER_ID": "456"},
 		},
 		{
 			name:        "Docker json-file format",
@@ -41,7 +42,7 @@ func TestParseJSONLog(t *testing.T) {
 			wantOK:      true,
 			wantLevel:   "",
 			wantMessage: "container output\n",
-			wantFields:  map[string]string{"stream": "stdout", "time": "2024-01-01T00:00:00Z"},
+			wantFields:  map[string]string{"JSON_STREAM": "stdout", "JSON_TIME": "2024-01-01T00:00:00Z"},
 		},
 		{
 			name:   "not JSON - plain text",
@@ -57,27 +58,6 @@ func TestParseJSONLog(t *testing.T) {
 			name:   "JSON array instead of object",
 			line:   `["item1", "item2"]`,
 			wantOK: false,
-		},
-		{
-			name:        "JSON with numeric and boolean fields",
-			line:        `{"message":"test","count":42,"success":true}`,
-			wantOK:      true,
-			wantMessage: "test",
-			wantFields:  map[string]string{"count": "42", "success": "true"},
-		},
-		{
-			name:        "JSON with nested object",
-			line:        `{"message":"test","metadata":{"user":"alice","role":"admin"}}`,
-			wantOK:      true,
-			wantMessage: "test",
-			// Don't check exact JSON format since key order is non-deterministic
-		},
-		{
-			name:        "JSON with float values",
-			line:        `{"message":"test","pi":3.14,"count":100.0}`,
-			wantOK:      true,
-			wantMessage: "test",
-			wantFields:  map[string]string{"pi": "3.14", "count": "100"},
 		},
 		{
 			name:   "JSON with no message field",
@@ -149,14 +129,14 @@ func TestParseJSONLogSkipKeys(t *testing.T) {
 	if !ok {
 		t.Fatal("ParseJSONLog() returned false, want true")
 	}
-	if _, found := parsed.ExtraFields["ts"]; found {
+	if _, found := parsed.ExtraFields["JSON_TS"]; found {
 		t.Error("ts should be skipped")
 	}
-	if _, found := parsed.ExtraFields["time"]; found {
+	if _, found := parsed.ExtraFields["JSON_TIME"]; found {
 		t.Error("time should be skipped")
 	}
-	if parsed.ExtraFields["request_id"] != "abc" {
-		t.Errorf("request_id = %q, want %q", parsed.ExtraFields["request_id"], "abc")
+	if parsed.ExtraFields["JSON_REQUEST_ID"] != "abc" {
+		t.Errorf("JSON_REQUEST_ID = %q, want %q", parsed.ExtraFields["JSON_REQUEST_ID"], "abc")
 	}
 }
 
@@ -216,39 +196,69 @@ func TestParseJSONLogSkipKeysWithInline(t *testing.T) {
 		t.Error("InlineJSON should contain request_id")
 	}
 	// ts must not appear in InlineJSON
-	if len(parsed.InlineJSON) > 0 {
-		// The inline JSON should not contain "ts"
-		for _, key := range []string{`"ts"`} {
-			if contains := len(parsed.InlineJSON) > 0; contains {
-				// Just check ts key not present as a JSON key
-				_ = key
-			}
-		}
+	if strings.Contains(parsed.InlineJSON, `"ts"`) {
+		t.Errorf("InlineJSON should not contain ts, got %s", parsed.InlineJSON)
 	}
 }
 
-func TestSanitizeFieldName(t *testing.T) {
+func TestFlattenJSON(t *testing.T) {
 	tests := []struct {
-		input string
-		want  string
+		name string
+		obj  map[string]any
+		want map[string]string
 	}{
-		{"request_id", "REQUEST_ID"},
-		{"user-name", "USER_NAME"},
-		{"http.method", "HTTP_METHOD"},
-		{"123field", "_123FIELD"},
-		{"MixedCase", "MIXEDCASE"},
-		{"with spaces", "WITH_SPACES"},
-		{"special!@#chars", "SPECIAL___CHARS"},
-		{"_leading_underscore", "_LEADING_UNDERSCORE"},
-		{"ALREADY_UPPER", "ALREADY_UPPER"},
-		{"", ""},
+		{
+			name: "string value",
+			obj:  map[string]any{"request_id": "abc"},
+			want: map[string]string{"JSON_REQUEST_ID": "abc"},
+		},
+		{
+			name: "integer float",
+			obj:  map[string]any{"count": float64(42)},
+			want: map[string]string{"JSON_COUNT": "42"},
+		},
+		{
+			name: "fractional float",
+			obj:  map[string]any{"pi": 3.14},
+			want: map[string]string{"JSON_PI": "3.14"},
+		},
+		{
+			name: "boolean",
+			obj:  map[string]any{"success": true},
+			want: map[string]string{"JSON_SUCCESS": "true"},
+		},
+		{
+			name: "null skipped",
+			obj:  map[string]any{"gone": nil},
+			want: map[string]string{},
+		},
+		{
+			name: "nested object",
+			obj:  map[string]any{"meta": map[string]any{"user": "alice"}},
+			want: map[string]string{"JSON_META": `{"user":"alice"}`},
+		},
+		{
+			name: "special chars in key",
+			obj:  map[string]any{"http.method": "GET", "user-name": "alice", "123field": "val"},
+			want: map[string]string{"JSON_HTTP_METHOD": "GET", "JSON_USER_NAME": "alice", "JSON__123FIELD": "val"},
+		},
+		{
+			name: "empty map",
+			obj:  map[string]any{},
+			want: map[string]string{},
+		},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.input, func(t *testing.T) {
-			got := sanitizeFieldName(tt.input)
-			if got != tt.want {
-				t.Errorf("sanitizeFieldName(%q) = %q, want %q", tt.input, got, tt.want)
+		t.Run(tt.name, func(t *testing.T) {
+			got := flattenJSON(tt.obj)
+			if len(got) != len(tt.want) {
+				t.Fatalf("got %d fields, want %d: %v", len(got), len(tt.want), got)
+			}
+			for k, v := range tt.want {
+				if got[k] != v {
+					t.Errorf("%s = %q, want %q", k, got[k], v)
+				}
 			}
 		})
 	}

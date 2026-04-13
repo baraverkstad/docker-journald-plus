@@ -202,14 +202,14 @@ func (d *Driver) consumeLog(ctx context.Context, f io.ReadCloser, lc *logConsume
 
 	merger := newMultilineMerger(lc.cfg, func(msg mergedMessage) {
 		line := msg.Line
-		var jsonFields map[string]string
+		var fields map[string]string
 		var priority Priority
 		priorityDetected := false
 
 		// Try JSON parsing first if enabled
 		if parsed, ok := ParseJSONLog(lc.cfg, line); ok {
 			// JSON parsing succeeded
-			jsonFields = parsed.ExtraFields
+			fields = parsed.ExtraFields
 
 			// Use JSON message as log body, appending inline JSON if present
 			msg := parsed.Message
@@ -240,7 +240,7 @@ func (d *Driver) consumeLog(ctx context.Context, f io.ReadCloser, lc *logConsume
 		}
 
 		// Write to journal with JSON fields
-		if err := lc.writer.Write(msg, priority, line, jsonFields); err != nil {
+		if err := lc.writer.Write(msg, priority, line, fields); err != nil {
 			lc.logError("error writing to journal: %v", err)
 		}
 	})
