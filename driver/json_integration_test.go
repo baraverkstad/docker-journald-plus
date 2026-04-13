@@ -1,7 +1,6 @@
 package driver
 
 import (
-	"encoding/json"
 	"strings"
 	"testing"
 )
@@ -12,10 +11,10 @@ func TestJSONParsingIntegration(t *testing.T) {
 		"parse-json": "true",
 	})
 
-	infoJSON, _ := json.Marshal(containerInfo{
+	info := containerInfo{
 		ContainerID:   "test123",
 		ContainerName: "/testcontainer",
-	})
+	}
 
 	var lastMsg string
 	var lastPri Priority
@@ -28,7 +27,7 @@ func TestJSONParsingIntegration(t *testing.T) {
 		return nil
 	}
 
-	w, err := newJournalWriter(cfg, json.RawMessage(infoJSON), sendFn)
+	w, err := newJournalWriter(cfg, info, sendFn)
 	if err != nil {
 		t.Fatalf("newJournalWriter: %v", err)
 	}
@@ -107,10 +106,10 @@ func TestJSONFieldSanitization(t *testing.T) {
 		"parse-json": "true",
 	})
 
-	infoJSON, _ := json.Marshal(containerInfo{
+	info := containerInfo{
 		ContainerID:   "test123",
 		ContainerName: "/testcontainer",
-	})
+	}
 
 	var lastVars map[string]string
 	sendFn := func(message string, priority Priority, vars map[string]string) error {
@@ -118,7 +117,7 @@ func TestJSONFieldSanitization(t *testing.T) {
 		return nil
 	}
 
-	w, err := newJournalWriter(cfg, json.RawMessage(infoJSON), sendFn)
+	w, err := newJournalWriter(cfg, info, sendFn)
 	if err != nil {
 		t.Fatalf("newJournalWriter: %v", err)
 	}

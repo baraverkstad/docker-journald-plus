@@ -102,7 +102,7 @@ func (d *Driver) handleStartLogging(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writer, err := newJournalWriter(cfg, req.Info, d.sendFn)
+	writer, err := newJournalWriter(cfg, info, d.sendFn)
 	if err != nil {
 		respondErr(w, fmt.Errorf("creating journal writer: %w", err))
 		return

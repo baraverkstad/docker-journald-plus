@@ -1,7 +1,6 @@
 package driver
 
 import (
-	"encoding/json"
 	"testing"
 )
 
@@ -37,7 +36,7 @@ func TestJournalWriterBaseVars(t *testing.T) {
 		"labels": "app,version",
 	})
 
-	infoJSON, _ := json.Marshal(containerInfo{
+	info := containerInfo{
 		ContainerID:        "abcdef123456789012345678",
 		ContainerName:      "/mycontainer",
 		ContainerImageName: "myimage:latest",
@@ -46,7 +45,7 @@ func TestJournalWriterBaseVars(t *testing.T) {
 			"version": "1.0",
 			"other":   "ignored",
 		},
-	})
+	}
 
 	var lastMsg string
 	var lastPri Priority
@@ -59,7 +58,7 @@ func TestJournalWriterBaseVars(t *testing.T) {
 		return nil
 	}
 
-	w, err := newJournalWriter(cfg, json.RawMessage(infoJSON), sendFn)
+	w, err := newJournalWriter(cfg, info, sendFn)
 	if err != nil {
 		t.Fatalf("newJournalWriter: %v", err)
 	}
@@ -103,10 +102,10 @@ func TestJournalWriterCustomTag(t *testing.T) {
 		"tag": "myapp",
 	})
 
-	infoJSON, _ := json.Marshal(containerInfo{
+	info := containerInfo{
 		ContainerID:   "abcdef123456789012345678",
 		ContainerName: "/container1",
-	})
+	}
 
 	var lastVars map[string]string
 	sendFn := func(message string, priority Priority, vars map[string]string) error {
@@ -114,7 +113,7 @@ func TestJournalWriterCustomTag(t *testing.T) {
 		return nil
 	}
 
-	w, err := newJournalWriter(cfg, json.RawMessage(infoJSON), sendFn)
+	w, err := newJournalWriter(cfg, info, sendFn)
 	if err != nil {
 		t.Fatalf("newJournalWriter: %v", err)
 	}
@@ -153,13 +152,13 @@ func TestJournalWriterTagTemplate(t *testing.T) {
 				cfg.Tag = tt.tag
 			}
 
-			infoJSON, _ := json.Marshal(containerInfo{
+			info := containerInfo{
 				ContainerID:        "abcdef123456789012345678",
 				ContainerName:      "/mycontainer",
 				ContainerImageName: "myimage:latest",
 				ContainerImageID:   "sha256:deadbeef123456789012345678",
 				DaemonName:         "docker",
-			})
+			}
 
 			var lastVars map[string]string
 			sendFn := func(message string, priority Priority, vars map[string]string) error {
@@ -167,7 +166,7 @@ func TestJournalWriterTagTemplate(t *testing.T) {
 				return nil
 			}
 
-			w, err := newJournalWriter(cfg, json.RawMessage(infoJSON), sendFn)
+			w, err := newJournalWriter(cfg, info, sendFn)
 			if err != nil {
 				t.Fatalf("newJournalWriter: %v", err)
 			}
@@ -190,10 +189,10 @@ func TestJournalWriterFieldExtraction(t *testing.T) {
 		"field-USER_ID":    `user=(\d+)`,
 	})
 
-	infoJSON, _ := json.Marshal(containerInfo{
+	info := containerInfo{
 		ContainerID:   "abcdef123456789012345678",
 		ContainerName: "/testcontainer",
-	})
+	}
 
 	var lastVars map[string]string
 	sendFn := func(message string, priority Priority, vars map[string]string) error {
@@ -201,7 +200,7 @@ func TestJournalWriterFieldExtraction(t *testing.T) {
 		return nil
 	}
 
-	w, err := newJournalWriter(cfg, json.RawMessage(infoJSON), sendFn)
+	w, err := newJournalWriter(cfg, info, sendFn)
 	if err != nil {
 		t.Fatalf("newJournalWriter: %v", err)
 	}

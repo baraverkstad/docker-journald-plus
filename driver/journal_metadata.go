@@ -2,7 +2,6 @@ package driver
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"maps"
 	"regexp"
@@ -80,12 +79,7 @@ type journalWriter struct {
 // In production this is journal.Send; in tests it can be replaced.
 type JournalSendFunc func(message string, priority Priority, vars map[string]string) error
 
-func newJournalWriter(cfg *Config, infoJSON json.RawMessage, sendFn JournalSendFunc) (*journalWriter, error) {
-	var info containerInfo
-	if err := json.Unmarshal(infoJSON, &info); err != nil {
-		return nil, fmt.Errorf("parsing container info: %w", err)
-	}
-
+func newJournalWriter(cfg *Config, info containerInfo, sendFn JournalSendFunc) (*journalWriter, error) {
 	w := &journalWriter{
 		cfg:    cfg,
 		info:   info,
