@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -221,7 +222,7 @@ func (d *Driver) consumeLog(ctx context.Context, f io.ReadCloser, lc *logConsume
 
 			// Detect priority from JSON level field
 			if parsed.Level != "" {
-				if pri, ok := JSONLevelToPriority(parsed.Level); ok {
+				if pri, ok := priorityNames[strings.ToLower(parsed.Level)]; ok {
 					priority = pri
 					priorityDetected = true
 				}

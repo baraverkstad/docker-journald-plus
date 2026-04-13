@@ -3,7 +3,6 @@ package driver
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 )
 
 // JSONParsedLog represents a successfully parsed JSON log line.
@@ -96,31 +95,6 @@ func ParseJSONLog(cfg *Config, line []byte) (*JSONParsedLog, bool) {
 	}
 
 	return result, true
-}
-
-// JSONLevelToPriority maps a JSON level string to a syslog priority.
-// Returns (priority, true) if recognized, (0, false) if not.
-func JSONLevelToPriority(level string) (Priority, bool) {
-	switch strings.ToLower(level) {
-	case "debug", "trace":
-		return 7, true // LOG_DEBUG
-	case "info", "information":
-		return 6, true // LOG_INFO
-	case "notice":
-		return 5, true // LOG_NOTICE
-	case "warn", "warning":
-		return 4, true // LOG_WARNING
-	case "error", "err":
-		return 3, true // LOG_ERR
-	case "fatal", "critical", "crit":
-		return 2, true // LOG_CRIT
-	case "panic", "alert":
-		return 1, true // LOG_ALERT
-	case "emerg", "emergency":
-		return 0, true // LOG_EMERG
-	default:
-		return 0, false
-	}
 }
 
 func formatFloat(f float64) string {

@@ -2,6 +2,7 @@ package driver
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 )
 
@@ -42,7 +43,7 @@ func TestJSONParsingIntegration(t *testing.T) {
 		t.Fatal("Expected JSON to be parsed")
 	}
 
-	priority, _ := JSONLevelToPriority(parsed.Level)
+	priority, _ := priorityNames[strings.ToLower(parsed.Level)]
 	err = w.Write(msg, priority, []byte(parsed.Message), parsed.ExtraFields)
 	if err != nil {
 		t.Fatalf("Write: %v", err)

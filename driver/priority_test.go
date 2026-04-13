@@ -4,6 +4,54 @@ import (
 	"testing"
 )
 
+func TestParsePriorityName(t *testing.T) {
+	tests := []struct {
+		input   string
+		wantPri Priority
+		wantErr bool
+	}{
+		{"emerg", PriEmerg, false},
+		{"emergency", PriEmerg, false},
+		{"EMERGENCY", PriEmerg, false},
+		{"alert", PriAlert, false},
+		{"panic", PriAlert, false},
+		{"PANIC", PriAlert, false},
+		{"crit", PriCrit, false},
+		{"critical", PriCrit, false},
+		{"CRITICAL", PriCrit, false},
+		{"fatal", PriCrit, false},
+		{"FATAL", PriCrit, false},
+		{"err", PriErr, false},
+		{"error", PriErr, false},
+		{"ERROR", PriErr, false},
+		{"warning", PriWarning, false},
+		{"warn", PriWarning, false},
+		{"WARNING", PriWarning, false},
+		{"notice", PriNotice, false},
+		{"NOTICE", PriNotice, false},
+		{"info", PriInfo, false},
+		{"information", PriInfo, false},
+		{"INFO", PriInfo, false},
+		{"debug", PriDebug, false},
+		{"trace", PriDebug, false},
+		{"DEBUG", PriDebug, false},
+		{"unknown", 0, true},
+		{"", 0, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			pri, err := parsePriorityName(tt.input)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("parsePriorityName(%q) error = %v, wantErr %v", tt.input, err, tt.wantErr)
+			}
+			if err == nil && pri != tt.wantPri {
+				t.Errorf("parsePriorityName(%q) = %d, want %d", tt.input, pri, tt.wantPri)
+			}
+		})
+	}
+}
+
 func mustConfig(t *testing.T, opts map[string]string) *Config {
 	t.Helper()
 	cfg, err := ParseConfig(opts)

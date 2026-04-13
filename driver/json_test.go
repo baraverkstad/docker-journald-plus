@@ -227,54 +227,6 @@ func TestParseJSONLogSkipKeysWithInline(t *testing.T) {
 	}
 }
 
-func TestJSONLevelToPriority(t *testing.T) {
-	tests := []struct {
-		level   string
-		wantPri Priority
-		wantOK  bool
-	}{
-		{"debug", 7, true},
-		{"DEBUG", 7, true},
-		{"trace", 7, true},
-		{"info", 6, true},
-		{"INFO", 6, true},
-		{"information", 6, true},
-		{"notice", 5, true},
-		{"NOTICE", 5, true},
-		{"warn", 4, true},
-		{"warning", 4, true},
-		{"WARNING", 4, true},
-		{"error", 3, true},
-		{"ERROR", 3, true},
-		{"err", 3, true},
-		{"fatal", 2, true},
-		{"FATAL", 2, true},
-		{"critical", 2, true},
-		{"CRITICAL", 2, true},
-		{"crit", 2, true},
-		{"panic", 1, true},
-		{"PANIC", 1, true},
-		{"alert", 1, true},
-		{"emerg", 0, true},
-		{"emergency", 0, true},
-		{"EMERGENCY", 0, true},
-		{"unknown", 0, false},
-		{"", 0, false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.level, func(t *testing.T) {
-			pri, ok := JSONLevelToPriority(tt.level)
-			if ok != tt.wantOK {
-				t.Errorf("JSONLevelToPriority(%q) ok = %v, want %v", tt.level, ok, tt.wantOK)
-			}
-			if ok && pri != tt.wantPri {
-				t.Errorf("JSONLevelToPriority(%q) = %d, want %d", tt.level, pri, tt.wantPri)
-			}
-		})
-	}
-}
-
 func TestSanitizeFieldName(t *testing.T) {
 	tests := []struct {
 		input string

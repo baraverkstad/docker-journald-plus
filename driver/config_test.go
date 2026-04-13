@@ -310,7 +310,7 @@ func TestParseConfigRejectsInvalid(t *testing.T) {
 		{"negative timeout", map[string]string{"multiline-timeout": "-5ms"}},
 		{"bad max-lines", map[string]string{"multiline-max-lines": "abc"}},
 		{"zero max-lines", map[string]string{"multiline-max-lines": "0"}},
-		{"bad priority name", map[string]string{"priority-default-stdout": "critical"}},
+		{"bad priority name", map[string]string{"priority-default-stdout": "unknown"}},
 		{"bad priority prefix", map[string]string{"priority-prefix": "maybe"}},
 		{"bad match regex", map[string]string{"priority-match-err": "[broken"}},
 		{"bad labels-regex", map[string]string{"labels-regex": "[broken"}},

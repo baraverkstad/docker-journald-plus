@@ -8,31 +8,6 @@ import (
 	"time"
 )
 
-// Priority represents a syslog/journal priority level.
-type Priority int
-
-const (
-	PriEmerg   Priority = 0
-	PriAlert   Priority = 1
-	PriCrit    Priority = 2
-	PriErr     Priority = 3
-	PriWarning Priority = 4
-	PriNotice  Priority = 5
-	PriInfo    Priority = 6
-	PriDebug   Priority = 7
-)
-
-var priorityNames = map[string]Priority{
-	"emerg":   PriEmerg,
-	"alert":   PriAlert,
-	"crit":    PriCrit,
-	"err":     PriErr,
-	"warning": PriWarning,
-	"notice":  PriNotice,
-	"info":    PriInfo,
-	"debug":   PriDebug,
-}
-
 // Config holds parsed and validated configuration for a single container.
 type Config struct {
 	// Inherited journald options
@@ -68,11 +43,6 @@ type Config struct {
 
 	// Field extraction
 	FieldExtractors []fieldExtractor // Regex patterns to extract custom fields
-}
-
-type priorityMatcher struct {
-	Priority Priority
-	Regex    *regexp.Regexp
 }
 
 type fieldExtractor struct {
@@ -239,24 +209,21 @@ func ParseConfig(opts map[string]string) (*Config, error) {
 	}
 
 	// Priority matchers (ordered emerg..debug)
-	// Each pattern allows up to 30 chars prefix to handle cases like:
-	//   "2026-02-15 15:15:16 0 [Note] InnoDB:..." after timestamp stripping -> "0 [Note] InnoDB:..."
 	matchKeys := []struct {
-		opt        string
-		pri        Priority
-		defaultPat string // default regex if option not set; empty = no default
+		opt string
+		pri Priority
 	}{
-		{"priority-match-emerg", PriEmerg, ""},
-		{"priority-match-alert", PriAlert, ""},
-		{"priority-match-crit", PriCrit, `^.{0,30}(CRITICAL|\[Critical\])`},
-		{"priority-match-err", PriErr, `^.{0,30}(ERROR|FATAL|\[ERROR\]|\[Fatal\])`},
-		{"priority-match-warning", PriWarning, `^.{0,30}(WARN|WARNING|\[Warning\])`},
-		{"priority-match-notice", PriNotice, ""},
-		{"priority-match-info", PriInfo, ""},
-		{"priority-match-debug", PriDebug, `^.{0,30}(DEBUG|\[Debug\])`},
+		{"priority-match-emerg", PriEmerg},
+		{"priority-match-alert", PriAlert},
+		{"priority-match-crit", PriCrit},
+		{"priority-match-err", PriErr},
+		{"priority-match-warning", PriWarning},
+		{"priority-match-notice", PriNotice},
+		{"priority-match-info", PriInfo},
+		{"priority-match-debug", PriDebug},
 	}
 	for _, mk := range matchKeys {
-		pattern := mk.defaultPat
+		pattern := priorityPatterns[mk.pri]
 		if v, ok := opts[mk.opt]; ok {
 			pattern = v // user override (empty string disables)
 		}
@@ -378,14 +345,6 @@ func ParseConfig(opts map[string]string) (*Config, error) {
 	}
 
 	return cfg, nil
-}
-
-func parsePriorityName(s string) (Priority, error) {
-	p, ok := priorityNames[strings.ToLower(s)]
-	if !ok {
-		return 0, fmt.Errorf("unknown priority %q (valid: emerg, alert, crit, err, warning, notice, info, debug)", s)
-	}
-	return p, nil
 }
 
 // ExtractFields applies field extractors to a message and returns extracted field values.
