@@ -1,11 +1,11 @@
 # Changelog
 
-## Unreleased
+## v0.6 - 2026-04-14
 
 - Added `normalize-whitespace` option to collapse tabs and repeated spaces to a single space
 - Added `strip-priority` and `strip-priority-regex` options to remove log level from message text
 - Fixed timestamp stripping for single-digit hours (e.g. `2026-02-21 6:36:00`)
-- [Commit list](https://github.com/baraverkstad/docker-journald-plus/compare/v0.5...HEAD)
+- [Commit list](https://github.com/baraverkstad/docker-journald-plus/compare/v0.5...v0.6)
 
 ## v0.5 - 2026-04-06
 
