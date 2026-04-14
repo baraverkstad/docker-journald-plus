@@ -250,6 +250,20 @@ Trailing separators (whitespace, `-`, `|`, `:`) after the match are also strippe
 | `WARN: disk space low` | `disk space low` |
 | `INFO		Starting server` (Caddy-style) | `Starting server` |
 
+### Whitespace normalization
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `normalize-whitespace` | `false` | Collapse runs of tabs or repeated spaces to a single space in the log message. |
+
+When enabled, any sequence of one or more tabs (or two or more consecutive spaces) is replaced with a single space. Applied last in the pipeline, after timestamp stripping and priority detection/stripping.
+
+| Input | After normalization |
+|-------|---------------------|
+| `INFO\t\tStarting server` | `INFO Starting server` |
+| `ERROR  connection refused` | `ERROR connection refused` |
+| `[WARN]\t  disk space low` | `[WARN] disk space low` |
+
 ### JSON log parsing (experimental)
 
 | Option | Default | Description |

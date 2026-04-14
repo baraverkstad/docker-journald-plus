@@ -35,6 +35,7 @@ type Config struct {
 	PriorityMatchers      []priorityMatcher // ordered emerg..debug
 	StripPriority         bool
 	StripPriorityRegex    *regexp.Regexp // nil when strip-priority=false
+	NormalizeWhitespace   bool
 
 	// JSON parsing
 	ParseJSON       bool
@@ -83,6 +84,8 @@ var knownOpts = map[string]bool{
 
 	"strip-priority":       true,
 	"strip-priority-regex": true,
+
+	"normalize-whitespace": true,
 
 	"json-parse":        true,
 	"parse-json":        true, // deprecated alias for json-parse
@@ -221,6 +224,12 @@ func ParseConfig(opts map[string]string) (*Config, error) {
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	// Whitespace normalization
+	cfg.NormalizeWhitespace, err = parseBoolOpt(opts, "normalize-whitespace", false)
+	if err != nil {
+		return nil, err
 	}
 
 	// JSON (json-parse is canonical, parse-json is the legacy alias)
