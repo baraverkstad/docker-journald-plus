@@ -29,9 +29,7 @@
 - **Architecture**: Docker v2 managed plugin; writes structured log entries to host journald socket.
 - **Protocol**: per-container FIFO with 4-byte big-endian length-prefixed protobuf; must drain FIFO before responding to `StopLogging`.
 - **Tag**: defaults to container name (not short ID, unlike the built-in driver).
-- **Pipeline**: Proto decode → Partial reassembly → Multiline merge → JSON/Regex extract → Priority detect → journald socket write
 - **Multiline**: Buffer lines matching regex; flush on 10ms timeout
-- **Priority**: Detect via JSON `level` key first, then regex matches on message
 - **JSON extraction**: Zero overhead when disabled (single boolean check); invalid JSON falls back to raw text
 - **Testing**: Inject `SendFunc` for isolated unit tests without a live journald socket
 

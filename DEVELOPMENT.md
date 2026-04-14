@@ -17,8 +17,8 @@ make publish      # Build multi-arch plugins and push to Docker Hub
 | `main.go` | Plugin API entrypoint |
 | `driver/driver.go` | HTTP handlers, consumer lifecycle, orchestration |
 | `driver/config.go` | Parse and validate log-opt options into `Config` struct |
-| `driver/journal.go` | Build journald field list and write entries |
-| `driver/journal_send.go` | Low-level journald socket protocol (pure Go) |
+| `driver/journal_metadata.go` | Build journald field list and write entries |
+| `driver/journal_socket.go` | Low-level journald socket protocol (pure Go) |
 | `driver/multiline.go` | Continuation-line merging with configurable regex/timeout |
 | `driver/partial.go` | Reassemble split protobuf log entries |
 | `driver/priority.go` | Priority detection (prefix, regex, default) |
