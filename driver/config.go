@@ -33,6 +33,8 @@ type Config struct {
 	PriorityDefaultStdout Priority
 	PriorityDefaultStderr Priority
 	PriorityMatchers      []priorityMatcher // ordered emerg..debug
+	StripPriority         bool
+	StripPriorityRegex    *regexp.Regexp // nil when strip-priority=false
 
 	// JSON parsing
 	ParseJSON       bool
@@ -78,6 +80,9 @@ var knownOpts = map[string]bool{
 
 	"strip-timestamp":       true,
 	"strip-timestamp-regex": true,
+
+	"strip-priority":       true,
+	"strip-priority-regex": true,
 
 	"json-parse":        true,
 	"parse-json":        true, // deprecated alias for json-parse
@@ -200,6 +205,19 @@ func ParseConfig(opts map[string]string) (*Config, error) {
 	}
 	if cfg.StripTimestamp {
 		cfg.StripTimestampRegex, err = parseRegexOpt(opts, "strip-timestamp-regex", buildTimestampPattern())
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Priority stripping
+	cfg.StripPriority, err = parseBoolOpt(opts, "strip-priority", false)
+	if err != nil {
+		return nil, err
+	}
+	if cfg.StripPriority {
+		pattern := `(?i)^\[?(trace|debug|info|notice|note|warning|warn|critical|error|fatal|alert|emerg)\]?`
+		cfg.StripPriorityRegex, err = parseRegexOpt(opts, "strip-priority-regex", pattern)
 		if err != nil {
 			return nil, err
 		}

@@ -92,3 +92,21 @@ func DetectPriority(cfg *Config, firstLine []byte, source string) (Priority, []b
 	}
 	return cfg.PriorityDefaultStdout, firstLine
 }
+
+// StripPriority removes the leading priority level string from line using re,
+// followed by any trailing separators. Returns line unchanged if re is nil or
+// does not match.
+func StripPriority(line []byte, re *regexp.Regexp) []byte {
+	if re == nil {
+		return line
+	}
+	loc := re.FindIndex(line)
+	if loc == nil {
+		return line
+	}
+	rest := line[loc[1]:]
+	if sepLoc := trailingSep.FindIndex(rest); sepLoc != nil && sepLoc[1] > 0 {
+		rest = rest[sepLoc[1]:]
+	}
+	return rest
+}

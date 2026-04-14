@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added `strip-priority` and `strip-priority-regex` options to remove log level from message text
 - Fixed timestamp stripping for single-digit hours (e.g. `2026-02-21 6:36:00`)
 - [Commit list](https://github.com/baraverkstad/docker-journald-plus/compare/v0.5...HEAD)
 

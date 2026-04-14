@@ -213,3 +213,90 @@ func TestDetectPriorityPrefixTooLong(t *testing.T) {
 		t.Errorf("priority = %d, want %d (should fall through to default)", pri, PriInfo)
 	}
 }
+
+func TestStripPriority(t *testing.T) {
+	tests := []struct {
+		line    string
+		opts    map[string]string
+		wantNil bool
+		want    string
+	}{
+		{
+			line:    "INFO something",
+			opts:    map[string]string{},
+			wantNil: true,
+			want:    "INFO something",
+		},
+		{
+			line: "INFO something",
+			opts: map[string]string{"strip-priority": "true"},
+			want: "something",
+		},
+		{
+			line: "WARN something",
+			opts: map[string]string{"strip-priority": "true"},
+			want: "something",
+		},
+		{
+			line: "ERROR something",
+			opts: map[string]string{"strip-priority": "true"},
+			want: "something",
+		},
+		{
+			line: "[INFO] something",
+			opts: map[string]string{"strip-priority": "true"},
+			want: "something",
+		},
+		{
+			line: "[Error] something",
+			opts: map[string]string{"strip-priority": "true"},
+			want: "something",
+		},
+		{
+			line: "[Debug] something",
+			opts: map[string]string{"strip-priority": "true"},
+			want: "something",
+		},
+		{
+			line: "INFO: something",
+			opts: map[string]string{"strip-priority": "true"},
+			want: "something",
+		},
+		{
+			line: "INFO\t\tsomething",
+			opts: map[string]string{"strip-priority": "true"},
+			want: "something",
+		},
+		{
+			line: "just a message",
+			opts: map[string]string{"strip-priority": "true"},
+			want: "just a message",
+		},
+		{
+			line: "INFO first\n  continuation",
+			opts: map[string]string{"strip-priority": "true"},
+			want: "first\n  continuation",
+		},
+		{
+			line: " 0 [Note] InnoDB: thing",
+			opts: map[string]string{
+				"strip-priority":       "true",
+				"strip-priority-regex": `\d+ \[Note\] `,
+			},
+			want: "InnoDB: thing",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.line, func(t *testing.T) {
+			cfg := mustConfig(t, tt.opts)
+			if tt.wantNil && cfg.StripPriorityRegex != nil {
+				t.Errorf("StripPriorityRegex = %v, want nil", cfg.StripPriorityRegex)
+			}
+			got := string(StripPriority([]byte(tt.line), cfg.StripPriorityRegex))
+			if got != tt.want {
+				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}

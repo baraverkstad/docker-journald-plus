@@ -239,6 +239,11 @@ func (d *Driver) consumeLog(ctx context.Context, f io.ReadCloser, lc *logConsume
 			priority, line = DetectPriority(lc.cfg, line, msg.Source)
 		}
 
+		// Strip priority level string from message if enabled
+		if lc.cfg.StripPriority {
+			line = StripPriority(line, lc.cfg.StripPriorityRegex)
+		}
+
 		// Write to journal with JSON fields
 		if err := lc.writer.Write(msg, priority, line, fields); err != nil {
 			lc.logError("error writing to journal: %v", err)

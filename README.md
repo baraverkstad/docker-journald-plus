@@ -228,6 +228,28 @@ Trailing separators (whitespace, `-`, `|`, `:`) after the timestamp are also
 stripped. Timezone abbreviations are limited to Z/UTC/GMT to avoid accidentally
 matching log level words like ERROR or WARN.
 
+### Priority stripping (experimental)
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `strip-priority` | `false` | Strip leading log level from log message. Having log level both in the journal PRIORITY field and in MESSAGE is redundant. |
+| `strip-priority-regex` | *(built-in)* | Override the default pattern with a custom regex. Only used when `strip-priority=true`. |
+
+When enabled, the leading log level keyword is stripped **after** priority detection. The default regex matches common level keywords at the start of the message, optionally bracketed:
+
+```
+(?i)^\[?(trace|debug|info|notice|note|warning|warn|critical|error|fatal|alert|emerg)\]?
+```
+
+Trailing separators (whitespace, `-`, `|`, `:`) after the match are also stripped. Because the regex is anchored to `^`, only the first line of a multiline-merged message is affected; continuation lines are never touched.
+
+| Input | After stripping |
+|-------|----------------|
+| `INFO request completed` | `request completed` |
+| `[Error] connection refused` | `connection refused` |
+| `WARN: disk space low` | `disk space low` |
+| `INFO		Starting server` (Caddy-style) | `Starting server` |
+
 ### JSON log parsing (experimental)
 
 | Option | Default | Description |
