@@ -25,8 +25,8 @@ type Config struct {
 	MultilineSep      string
 
 	// Timestamp stripping
-	StripTimestamp         bool
-	StripTimestampPatterns []*regexp.Regexp // compiled; nil if disabled
+	StripTimestamp      bool
+	StripTimestampRegex *regexp.Regexp
 
 	// Priority
 	PriorityPrefix        bool
@@ -105,50 +105,27 @@ func ParseConfig(opts map[string]string) (*Config, error) {
 		PriorityDefaultStderr: PriErr,
 	}
 
-	// Tag
+	var err error
+
 	cfg.Tag = opts["tag"]
 
-	// Labels
-	if v, ok := opts["labels"]; ok && v != "" {
-		cfg.Labels = strings.Split(v, ",")
-	}
-	if v, ok := opts["labels-regex"]; ok && v != "" {
-		r, err := regexp.Compile(v)
-		if err != nil {
-			return nil, fmt.Errorf("invalid labels-regex %q: %w", v, err)
-		}
-		cfg.LabelsRegex = r
+	cfg.Labels = parseArrOpt(opts, "labels", nil)
+	cfg.LabelsRegex, err = parseRegexOpt(opts, "labels-regex", "")
+	if err != nil {
+		return nil, err
 	}
 
-	// Env
-	if v, ok := opts["env"]; ok && v != "" {
-		cfg.Env = strings.Split(v, ",")
-	}
-	if v, ok := opts["env-regex"]; ok && v != "" {
-		r, err := regexp.Compile(v)
-		if err != nil {
-			return nil, fmt.Errorf("invalid env-regex %q: %w", v, err)
-		}
-		cfg.EnvRegex = r
+	cfg.Env = parseArrOpt(opts, "env", nil)
+	cfg.EnvRegex, err = parseRegexOpt(opts, "env-regex", "")
+	if err != nil {
+		return nil, err
 	}
 
-	// Multiline regex
-	if v, ok := opts["multiline-regex"]; ok {
-		if v == "" {
-			cfg.MultilineRegex = nil // explicitly disabled
-		} else {
-			r, err := regexp.Compile(v)
-			if err != nil {
-				return nil, fmt.Errorf("invalid multiline-regex %q: %w", v, err)
-			}
-			cfg.MultilineRegex = r
-		}
-	} else {
-		// Default: lines starting with whitespace are continuations
-		cfg.MultilineRegex = regexp.MustCompile(`^\s`)
+	// Multiline (empty regex disables, absent uses default)
+	cfg.MultilineRegex, err = parseRegexOpt(opts, "multiline-regex", `^\s`)
+	if err != nil {
+		return nil, err
 	}
-
-	// Multiline timeout
 	if v, ok := opts["multiline-timeout"]; ok {
 		d, err := time.ParseDuration(v)
 		if err != nil {
@@ -159,40 +136,23 @@ func ParseConfig(opts map[string]string) (*Config, error) {
 		}
 		cfg.MultilineTimeout = d
 	}
-
-	// Multiline max lines
-	if v, ok := opts["multiline-max-lines"]; ok {
-		n, err := strconv.Atoi(v)
-		if err != nil || n <= 0 {
-			return nil, fmt.Errorf("invalid multiline-max-lines %q: must be a positive integer", v)
-		}
-		cfg.MultilineMaxLines = n
+	cfg.MultilineMaxLines, err = parseIntOpt(opts, "multiline-max-lines", 100)
+	if err != nil {
+		return nil, err
 	}
-
-	// Multiline max bytes
-	if v, ok := opts["multiline-max-bytes"]; ok {
-		n, err := strconv.Atoi(v)
-		if err != nil || n <= 0 {
-			return nil, fmt.Errorf("invalid multiline-max-bytes %q: must be a positive integer", v)
-		}
-		cfg.MultilineMaxBytes = n
+	cfg.MultilineMaxBytes, err = parseIntOpt(opts, "multiline-max-bytes", 1048576)
+	if err != nil {
+		return nil, err
 	}
-
-	// Multiline separator
 	if v, ok := opts["multiline-separator"]; ok {
 		cfg.MultilineSep = v
 	}
 
-	// Priority prefix
-	if v, ok := opts["priority-prefix"]; ok {
-		b, err := strconv.ParseBool(v)
-		if err != nil {
-			return nil, fmt.Errorf("invalid priority-prefix %q: must be true or false", v)
-		}
-		cfg.PriorityPrefix = b
+	// Priority
+	cfg.PriorityPrefix, err = parseBoolOpt(opts, "priority-prefix", true)
+	if err != nil {
+		return nil, err
 	}
-
-	// Priority defaults
 	if v, ok := opts["priority-default-stdout"]; ok {
 		p, err := parsePriorityName(v)
 		if err != nil {
@@ -207,8 +167,6 @@ func ParseConfig(opts map[string]string) (*Config, error) {
 		}
 		cfg.PriorityDefaultStderr = p
 	}
-
-	// Priority matchers (ordered emerg..debug)
 	matchKeys := []struct {
 		opt string
 		pri Priority
@@ -223,90 +181,43 @@ func ParseConfig(opts map[string]string) (*Config, error) {
 		{"priority-match-debug", PriDebug},
 	}
 	for _, mk := range matchKeys {
-		pattern := priorityPatterns[mk.pri]
-		if v, ok := opts[mk.opt]; ok {
-			pattern = v // user override (empty string disables)
-		}
-		if pattern == "" {
-			continue
-		}
-		r, err := regexp.Compile(pattern)
+		r, err := parseRegexOpt(opts, mk.opt, priorityPatterns[mk.pri])
 		if err != nil {
-			return nil, fmt.Errorf("invalid %s %q: %w", mk.opt, pattern, err)
+			return nil, err
 		}
-		cfg.PriorityMatchers = append(cfg.PriorityMatchers, priorityMatcher{
-			Priority: mk.pri,
-			Regex:    r,
-		})
+		if r != nil {
+			cfg.PriorityMatchers = append(cfg.PriorityMatchers, priorityMatcher{
+				Priority: mk.pri,
+				Regex:    r,
+			})
+		}
 	}
 
 	// Timestamp stripping
-	if v, ok := opts["strip-timestamp"]; ok {
-		b, err := strconv.ParseBool(v)
-		if err != nil {
-			return nil, fmt.Errorf("invalid strip-timestamp %q: must be true or false", v)
-		}
-		cfg.StripTimestamp = b
+	cfg.StripTimestamp, err = parseBoolOpt(opts, "strip-timestamp", false)
+	if err != nil {
+		return nil, err
 	}
 	if cfg.StripTimestamp {
-		if v, ok := opts["strip-timestamp-regex"]; ok && v != "" {
-			// User-provided single pattern
-			patterns, err := compileTimestampPatterns([]string{v})
-			if err != nil {
-				return nil, fmt.Errorf("invalid strip-timestamp-regex %q: %w", v, err)
-			}
-			cfg.StripTimestampPatterns = patterns
-		} else {
-			// Use built-in patterns
-			patterns, err := compileTimestampPatterns(defaultTimestampPatterns)
-			if err != nil {
-				return nil, fmt.Errorf("compiling default timestamp patterns: %w", err)
-			}
-			cfg.StripTimestampPatterns = patterns
+		cfg.StripTimestampRegex, err = parseRegexOpt(opts, "strip-timestamp-regex", buildTimestampPattern())
+		if err != nil {
+			return nil, err
 		}
 	}
 
-	// JSON parsing on/off; json-parse is canonical, parse-json is the legacy alias
+	// JSON (json-parse is canonical, parse-json is the legacy alias)
 	for _, key := range []string{"json-parse", "parse-json"} {
-		if v, ok := opts[key]; ok {
-			b, err := strconv.ParseBool(v)
+		if _, ok := opts[key]; ok {
+			cfg.ParseJSON, err = parseBoolOpt(opts, key, false)
 			if err != nil {
-				return nil, fmt.Errorf("invalid %s %q: must be true or false", key, v)
+				return nil, err
 			}
-			cfg.ParseJSON = b
-			break // json-parse checked first; once found, stop
+			break
 		}
 	}
-
-	// JSON level keys (comma-separated, defaults to "level,severity,log_level")
-	if v, ok := opts["json-level-keys"]; ok && v != "" {
-		cfg.JSONLevelKeys = strings.Split(v, ",")
-		for i := range cfg.JSONLevelKeys {
-			cfg.JSONLevelKeys[i] = strings.TrimSpace(cfg.JSONLevelKeys[i])
-		}
-	} else {
-		cfg.JSONLevelKeys = []string{"level", "severity", "log_level"}
-	}
-
-	// JSON message keys (comma-separated, defaults to "message,msg,log")
-	if v, ok := opts["json-message-keys"]; ok && v != "" {
-		cfg.JSONMessageKeys = strings.Split(v, ",")
-		for i := range cfg.JSONMessageKeys {
-			cfg.JSONMessageKeys[i] = strings.TrimSpace(cfg.JSONMessageKeys[i])
-		}
-	} else {
-		cfg.JSONMessageKeys = []string{"message", "msg", "log"}
-	}
-
-	// JSON skip keys (comma-separated; empty = skip nothing)
-	if v, ok := opts["json-skip-keys"]; ok && v != "" {
-		cfg.JSONSkipKeys = strings.Split(v, ",")
-		for i := range cfg.JSONSkipKeys {
-			cfg.JSONSkipKeys[i] = strings.TrimSpace(cfg.JSONSkipKeys[i])
-		}
-	}
-
-	// JSON extra: where remaining fields go (fields=journal entries, inline=append to message)
+	cfg.JSONLevelKeys = parseArrOpt(opts, "json-level-keys", []string{"level", "severity", "log_level"})
+	cfg.JSONMessageKeys = parseArrOpt(opts, "json-message-keys", []string{"message", "msg", "log"})
+	cfg.JSONSkipKeys = parseArrOpt(opts, "json-skip-keys", nil)
 	if v, ok := opts["json-extra"]; ok {
 		switch v {
 		case "fields", "":
@@ -318,7 +229,7 @@ func ParseConfig(opts map[string]string) (*Config, error) {
 		}
 	}
 
-	// Field extractors (field-FIELDNAME options)
+	// Field extractors
 	for key, pattern := range opts {
 		if !strings.HasPrefix(key, "field-") {
 			continue
@@ -345,6 +256,57 @@ func ParseConfig(opts map[string]string) (*Config, error) {
 	}
 
 	return cfg, nil
+}
+
+func parseBoolOpt(opts map[string]string, key string, def bool) (bool, error) {
+	v, ok := opts[key]
+	if !ok {
+		return def, nil
+	}
+	b, err := strconv.ParseBool(v)
+	if err != nil {
+		return false, fmt.Errorf("invalid %s %q: must be true or false", key, v)
+	}
+	return b, nil
+}
+
+func parseIntOpt(opts map[string]string, key string, def int) (int, error) {
+	v, ok := opts[key]
+	if !ok {
+		return def, nil
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n <= 0 {
+		return 0, fmt.Errorf("invalid %s %q: must be a positive integer", key, v)
+	}
+	return n, nil
+}
+
+func parseRegexOpt(opts map[string]string, key string, def string) (*regexp.Regexp, error) {
+	v, ok := opts[key]
+	if !ok {
+		v = def
+	}
+	if v == "" {
+		return nil, nil
+	}
+	r, err := regexp.Compile(v)
+	if err != nil {
+		return nil, fmt.Errorf("invalid %s %q: %w", key, v, err)
+	}
+	return r, nil
+}
+
+func parseArrOpt(opts map[string]string, key string, def []string) []string {
+	v, ok := opts[key]
+	if !ok || v == "" {
+		return def
+	}
+	parts := strings.Split(v, ",")
+	for i := range parts {
+		parts[i] = strings.TrimSpace(parts[i])
+	}
+	return parts
 }
 
 // ExtractFields applies field extractors to a message and returns extracted field values.

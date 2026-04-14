@@ -231,7 +231,7 @@ func (d *Driver) consumeLog(ctx context.Context, f io.ReadCloser, lc *logConsume
 
 		// Strip timestamp (before priority detection so ^ERROR matches after stripping)
 		if lc.cfg.StripTimestamp {
-			line = StripTimestamp(line, lc.cfg.StripTimestampPatterns)
+			line = StripTimestamp(line, lc.cfg.StripTimestampRegex)
 		}
 
 		// Detect priority via regex/default if not already detected from JSON

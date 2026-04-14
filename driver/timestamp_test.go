@@ -5,17 +5,17 @@ import (
 	"testing"
 )
 
-func compileDefaults(t *testing.T) []*regexp.Regexp {
+func defaultTimestampRegex(t *testing.T) *regexp.Regexp {
 	t.Helper()
-	patterns, err := compileTimestampPatterns(defaultTimestampPatterns)
+	re, err := regexp.Compile(buildTimestampPattern())
 	if err != nil {
-		t.Fatalf("compileTimestampPatterns: %v", err)
+		t.Fatalf("buildTimestampPattern: %v", err)
 	}
-	return patterns
+	return re
 }
 
 func TestStripTimestampISO8601(t *testing.T) {
-	patterns := compileDefaults(t)
+	re := defaultTimestampRegex(t)
 
 	tests := []struct {
 		name string
@@ -46,7 +46,7 @@ func TestStripTimestampISO8601(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := StripTimestamp([]byte(tt.line), patterns)
+			got := StripTimestamp([]byte(tt.line), re)
 			if string(got) != tt.want {
 				t.Errorf("StripTimestamp(%q) = %q, want %q", tt.line, string(got), tt.want)
 			}
@@ -55,7 +55,7 @@ func TestStripTimestampISO8601(t *testing.T) {
 }
 
 func TestStripTimestampGoLog(t *testing.T) {
-	patterns := compileDefaults(t)
+	re := defaultTimestampRegex(t)
 
 	tests := []struct {
 		line string
@@ -66,7 +66,7 @@ func TestStripTimestampGoLog(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		got := StripTimestamp([]byte(tt.line), patterns)
+		got := StripTimestamp([]byte(tt.line), re)
 		if string(got) != tt.want {
 			t.Errorf("StripTimestamp(%q) = %q, want %q", tt.line, string(got), tt.want)
 		}
@@ -74,7 +74,7 @@ func TestStripTimestampGoLog(t *testing.T) {
 }
 
 func TestStripTimestampSyslog(t *testing.T) {
-	patterns := compileDefaults(t)
+	re := defaultTimestampRegex(t)
 
 	tests := []struct {
 		line string
@@ -86,7 +86,7 @@ func TestStripTimestampSyslog(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		got := StripTimestamp([]byte(tt.line), patterns)
+		got := StripTimestamp([]byte(tt.line), re)
 		if string(got) != tt.want {
 			t.Errorf("StripTimestamp(%q) = %q, want %q", tt.line, string(got), tt.want)
 		}
@@ -94,7 +94,7 @@ func TestStripTimestampSyslog(t *testing.T) {
 }
 
 func TestStripTimestampApacheCLF(t *testing.T) {
-	patterns := compileDefaults(t)
+	re := defaultTimestampRegex(t)
 
 	tests := []struct {
 		line string
@@ -105,7 +105,7 @@ func TestStripTimestampApacheCLF(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		got := StripTimestamp([]byte(tt.line), patterns)
+		got := StripTimestamp([]byte(tt.line), re)
 		if string(got) != tt.want {
 			t.Errorf("StripTimestamp(%q) = %q, want %q", tt.line, string(got), tt.want)
 		}
@@ -113,25 +113,25 @@ func TestStripTimestampApacheCLF(t *testing.T) {
 }
 
 func TestStripTimestampLog4jDate(t *testing.T) {
-	patterns := compileDefaults(t)
+	re := defaultTimestampRegex(t)
 
-	got := StripTimestamp([]byte("14 Nov 2017 20:30:20,434 INFO message"), patterns)
+	got := StripTimestamp([]byte("14 Nov 2017 20:30:20,434 INFO message"), re)
 	if string(got) != "INFO message" {
 		t.Errorf("got %q, want %q", string(got), "INFO message")
 	}
 }
 
 func TestStripTimestampApacheError(t *testing.T) {
-	patterns := compileDefaults(t)
+	re := defaultTimestampRegex(t)
 
-	got := StripTimestamp([]byte("Wed Oct 15 19:41:46.123456 2019 [error] message"), patterns)
+	got := StripTimestamp([]byte("Wed Oct 15 19:41:46.123456 2019 [error] message"), re)
 	if string(got) != "[error] message" {
 		t.Errorf("got %q, want %q", string(got), "[error] message")
 	}
 }
 
 func TestStripTimestampNoMatch(t *testing.T) {
-	patterns := compileDefaults(t)
+	re := defaultTimestampRegex(t)
 
 	tests := []string{
 		"ERROR no timestamp here",
@@ -142,7 +142,7 @@ func TestStripTimestampNoMatch(t *testing.T) {
 	}
 
 	for _, line := range tests {
-		got := StripTimestamp([]byte(line), patterns)
+		got := StripTimestamp([]byte(line), re)
 		if string(got) != line {
 			t.Errorf("StripTimestamp(%q) = %q, should be unchanged", line, string(got))
 		}
@@ -150,10 +150,10 @@ func TestStripTimestampNoMatch(t *testing.T) {
 }
 
 func TestStripTimestampOnlyTimestamp(t *testing.T) {
-	patterns := compileDefaults(t)
+	re := defaultTimestampRegex(t)
 
 	// If the entire line is just a timestamp, strip it and return empty
-	got := StripTimestamp([]byte("2024-01-15T10:30:45"), patterns)
+	got := StripTimestamp([]byte("2024-01-15T10:30:45"), re)
 	if string(got) != "" {
 		t.Errorf("got %q, want empty string when line is only timestamp", string(got))
 	}
@@ -161,12 +161,9 @@ func TestStripTimestampOnlyTimestamp(t *testing.T) {
 
 func TestStripTimestampCustomPattern(t *testing.T) {
 	// MySQL 5.6 short format: 230515 14:30:45
-	patterns, err := compileTimestampPatterns([]string{`^\d{6} \d{2}:\d{2}:\d{2}`})
-	if err != nil {
-		t.Fatal(err)
-	}
+	re := regexp.MustCompile(`^\d{6} \d{2}:\d{2}:\d{2}`)
 
-	got := StripTimestamp([]byte("230515 14:30:45 [Note] message"), patterns)
+	got := StripTimestamp([]byte("230515 14:30:45 [Note] message"), re)
 	if string(got) != "[Note] message" {
 		t.Errorf("got %q, want %q", string(got), "[Note] message")
 	}
