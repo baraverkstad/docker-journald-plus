@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Replaced `net/http` with a minimal HTTP/1.1 handler, reducing binary size by 50%
+- [Commit list](https://github.com/baraverkstad/docker-journald-plus/compare/v0.6...HEAD)
+
 ## v0.6 - 2026-04-14
 
 - Added `normalize-whitespace` option to collapse tabs and repeated spaces to a single space

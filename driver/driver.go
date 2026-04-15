@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"strings"
 	"sync"
@@ -46,11 +45,13 @@ func NewWithSendFunc(sendFn JournalSendFunc) *Driver {
 	}
 }
 
-// RegisterHandlers wires up the HTTP endpoints on the plugin handler.
-func (d *Driver) RegisterHandlers(mux *http.ServeMux) {
-	mux.HandleFunc("/LogDriver.StartLogging", d.handleStartLogging)
-	mux.HandleFunc("/LogDriver.StopLogging", d.handleStopLogging)
-	mux.HandleFunc("/LogDriver.Capabilities", d.handleCapabilities)
+// Routes returns the URL path → handler map for the plugin HTTP server.
+func (d *Driver) Routes() map[string]func([]byte) []byte {
+	return map[string]func([]byte) []byte{
+		"/LogDriver.StartLogging": d.handleStartLogging,
+		"/LogDriver.StopLogging":  d.handleStopLogging,
+		"/LogDriver.Capabilities": d.handleCapabilities,
+	}
 }
 
 // --- Request/Response types ---
@@ -66,46 +67,32 @@ type StopLoggingRequest struct {
 	File string `json:"File"`
 }
 
-// CapabilitiesResponse tells Docker what the driver supports.
-type CapabilitiesResponse struct {
-	Cap capability `json:"Cap"`
-	Err string     `json:"Err"`
-}
-
-type capability struct {
-	ReadLogs bool `json:"ReadLogs"`
-}
-
 type errResponse struct {
 	Err string `json:"Err"`
 }
 
 // --- Handlers ---
 
-func (d *Driver) handleStartLogging(w http.ResponseWriter, r *http.Request) {
+func (d *Driver) handleStartLogging(body []byte) []byte {
 	var req StartLoggingRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondErr(w, fmt.Errorf("decoding request: %w", err))
-		return
+	if err := json.Unmarshal(body, &req); err != nil {
+		return respondErr(fmt.Errorf("decoding request: %w", err))
 	}
 
 	// Parse container info to get Config map
 	var info containerInfo
 	if err := json.Unmarshal(req.Info, &info); err != nil {
-		respondErr(w, fmt.Errorf("parsing container info: %w", err))
-		return
+		return respondErr(fmt.Errorf("parsing container info: %w", err))
 	}
 
 	cfg, err := ParseConfig(info.Config)
 	if err != nil {
-		respondErr(w, fmt.Errorf("invalid log options: %w", err))
-		return
+		return respondErr(fmt.Errorf("invalid log options: %w", err))
 	}
 
 	writer, err := newJournalWriter(cfg, info, d.sendFn)
 	if err != nil {
-		respondErr(w, fmt.Errorf("creating journal writer: %w", err))
-		return
+		return respondErr(fmt.Errorf("creating journal writer: %w", err))
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -114,8 +101,7 @@ func (d *Driver) handleStartLogging(w http.ResponseWriter, r *http.Request) {
 	f, err := os.OpenFile(req.File, os.O_RDONLY|syscall.O_NONBLOCK, os.ModeNamedPipe)
 	if err != nil {
 		cancel()
-		respondErr(w, fmt.Errorf("opening fifo %s: %w", req.File, err))
-		return
+		return respondErr(fmt.Errorf("opening fifo %s: %w", req.File, err))
 	}
 
 	lc := &logConsumer{
@@ -132,14 +118,13 @@ func (d *Driver) handleStartLogging(w http.ResponseWriter, r *http.Request) {
 
 	go d.consumeLog(ctx, f, lc)
 
-	respondOK(w)
+	return respondOK()
 }
 
-func (d *Driver) handleStopLogging(w http.ResponseWriter, r *http.Request) {
+func (d *Driver) handleStopLogging(body []byte) []byte {
 	var req StopLoggingRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondErr(w, fmt.Errorf("decoding request: %w", err))
-		return
+	if err := json.Unmarshal(body, &req); err != nil {
+		return respondErr(fmt.Errorf("decoding request: %w", err))
 	}
 
 	d.mu.Lock()
@@ -154,14 +139,11 @@ func (d *Driver) handleStopLogging(w http.ResponseWriter, r *http.Request) {
 		<-lc.done // wait for consumer goroutine to finish draining
 	}
 
-	respondOK(w)
+	return respondOK()
 }
 
-func (d *Driver) handleCapabilities(w http.ResponseWriter, r *http.Request) {
-	resp := CapabilitiesResponse{
-		Cap: capability{ReadLogs: false},
-	}
-	json.NewEncoder(w).Encode(resp)
+func (d *Driver) handleCapabilities(_ []byte) []byte {
+	return []byte(`{"Cap":{"ReadLogs":false},"Err":""}`)
 }
 
 // logError rate-limits error logging to prevent log floods.
@@ -282,10 +264,11 @@ func (d *Driver) consumeLog(ctx context.Context, f io.ReadCloser, lc *logConsume
 
 // --- HTTP helpers ---
 
-func respondOK(w http.ResponseWriter) {
-	json.NewEncoder(w).Encode(errResponse{Err: ""})
+func respondOK() []byte {
+	return []byte(`{"Err":""}`)
 }
 
-func respondErr(w http.ResponseWriter, err error) {
-	json.NewEncoder(w).Encode(errResponse{Err: err.Error()})
+func respondErr(err error) []byte {
+	b, _ := json.Marshal(errResponse{Err: err.Error()})
+	return b
 }

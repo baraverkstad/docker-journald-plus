@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"net"
-	"net/http"
 	"os"
 	"syscall"
 
@@ -13,14 +12,11 @@ import (
 const socketPath = "/run/docker/plugins/journald-plus.sock"
 
 func main() {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/Plugin.Activate", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/vnd.docker.plugins.v1.1+json")
-		fmt.Fprintln(w, `{"Implements": ["LogDriver"]}`)
-	})
-
 	d := driver.New()
-	d.RegisterHandlers(mux)
+	routes := d.Routes()
+	routes["/Plugin.Activate"] = func(_ []byte) []byte {
+		return []byte(`{"Implements":["LogDriver"]}`)
+	}
 
 	if err := os.MkdirAll("/run/docker/plugins", 0755); err != nil {
 		fmt.Fprintf(os.Stderr, "journald-plus: %v\n", err)
@@ -35,7 +31,7 @@ func main() {
 	}
 
 	fmt.Fprintf(os.Stderr, "journald-plus: starting plugin server\n")
-	if err := http.Serve(l, mux); err != nil {
+	if err := driver.Serve(l, routes); err != nil {
 		fmt.Fprintf(os.Stderr, "journald-plus: %v\n", err)
 		os.Exit(1)
 	}

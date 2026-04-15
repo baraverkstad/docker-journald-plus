@@ -4,7 +4,7 @@
 ## References
 - [README.md] — features, installation, documentation
 - [CHANGELOG.md] — user-facing changes by version
-- [DEVELOPMENT.md] — project layout table, build/test commands, and local/integration testing steps
+- [DEVELOPMENT.md] — project layout table, build/test commands, and plugin testing steps
 - [Makefile] — canonical build tool
 - [.github/workflows/] — GitHub Actions publish to Docker Hub (`baraverkstad/journald-plus`)
 
