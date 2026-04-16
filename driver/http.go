@@ -76,11 +76,11 @@ func parseRequestPath(line string) string {
 		return ""
 	}
 	line = line[i+1:]
-	j := strings.IndexByte(line, ' ')
-	if j < 0 {
+	before, _, ok := strings.Cut(line, " ")
+	if !ok {
 		return strings.TrimRight(line, "\r\n")
 	}
-	return line[:j]
+	return before
 }
 
 // parseContentLength parses a "Content-Length: N" header line (case-insensitive).
