@@ -5,14 +5,14 @@ audience size. Blog posts are not needed until the final stage.
 
 ## Step 1: Reduce friction (prerequisites)
 
-Do this before any announcement. First impressions are hard to undo. See
-`plan-readme-fixup.md` for the full checklist.
+- [x] Do this before any announcement. First impressions are hard to undo. See
+      `plan-readme-fixup.md` for the full checklist.
 
 ## Step 2: Docker Hub presence
 
 Passive discoverability — anyone who finds the image lands here first.
 
-- [ ] Improve the Docker Hub description to include the comparison with the
+- [x] Improve the Docker Hub description to include the comparison with the
       built-in journald driver and a one-line install example.
 
 ## Step 3: Niche communities
