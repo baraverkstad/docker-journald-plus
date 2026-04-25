@@ -20,47 +20,16 @@ Read more: https://github.com/baraverkstad/docker-journald-plus
   as the built-in driver (CONTAINER_ID, CONTAINER_NAME, IMAGE_NAME, etc.)
 - **Pure Go** -- no CGO required; writes to journald via the native socket protocol
 
-## Installation
+### journald-plus vs built-in journald driver
 
-Docker plugins do not support multi-arch manifest lists, so there is no single
-tag that auto-selects the right architecture. Instead, install the arch-specific
-tag and assign it a local alias that your configuration will reference:
-
-```bash
-ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
-docker plugin install baraverkstad/journald-plus:[VER]-$ARCH \
-  --alias baraverkstad/journald-plus:[VER]
-```
-
-The `--alias` name (`baraverkstad/journald-plus:[VER]`) is what you put in
-`daemon.json`, `compose.yml`, or `--log-driver`. Never reference the underlying
-arch tag directly in config — only the alias is portable across machines.
-
-> **Note:** No `latest` tag is published. Use an arch-specific tag
-> (`latest-amd64`, `latest-arm64`) if you need the latest build without a
-> version alias, or prefer a versioned alias as shown above.
-
-## Upgrading
-
-A plugin that is in use by running containers cannot be disabled or upgraded
-in-place. The versioned alias pattern lets two plugin versions coexist so you
-can migrate services one at a time with no downtime:
-
-1. Install the new version under a new alias:
-   ```bash
-   ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
-   docker plugin install baraverkstad/journald-plus:[NEXT]-$ARCH \
-     --alias baraverkstad/journald-plus:[NEXT]
-   ```
-2. Update `daemon.json` or `compose.yml` to reference the new alias
-   (`baraverkstad/journald-plus:[NEXT]`).
-3. If using `daemon.json`, restart `dockerd` to pick up the new default driver.
-4. Recreate services to use the new alias one at a time.
-5. Once no containers reference the old alias, remove it:
-   ```bash
-   docker plugin disable baraverkstad/journald-plus:[VER]
-   docker plugin rm baraverkstad/journald-plus:[VER]
-   ```
+| Feature | Built-in `journald` | `journald-plus` |
+|---------|---------------------|-----------------|
+| Container metadata fields | Yes | Yes |
+| Tag default | Container ID (`{{.ID}}`) | Container name (`{{.Name}}`) |
+| Multiline merging | No | Yes (`^\s` default) |
+| Priority detection | No | Yes |
+| JSON log parsing | No | Yes |
+| `docker logs` | Yes (reads from journald) | No — use `journalctl` |
 
 ## Usage
 
@@ -94,7 +63,91 @@ Or set as default in `/etc/docker/daemon.json`:
 }
 ```
 
-## Configuration Options
+### Reading logs
+
+`docker logs` is **not** supported -- use `journalctl` instead:
+
+```bash
+journalctl -t myapp -f                # follow (like tail -f)
+journalctl -t myapp -p warning        # warnings and above
+journalctl -t myapp --since "1 hour ago"
+journalctl CONTAINER_ID=abc123def456  # filter by container ID
+```
+
+The tag (`-t`) defaults to the container name. To filter by priority across all
+containers: `journalctl -p err`. See [Configuration](#configuration) to customize
+the tag and other options.
+
+## Installation
+
+Replace `[VER]` with the desired release (e.g. `0.6`). Docker plugins do not
+support multi-arch manifests, so install the arch-specific tag and assign a
+local alias:
+
+```bash
+ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
+docker plugin install --alias baraverkstad/journald-plus:[VER] \
+  baraverkstad/journald-plus:[VER]-$ARCH
+```
+
+The alias (`baraverkstad/journald-plus:[VER]`) is what you reference in
+`daemon.json`, `compose.yml`, or `--log-driver`. Never reference the arch-specific
+tag directly in config -- only the alias is portable across machines.
+
+> **Note:** No `latest` tag is published. Use `latest-amd64` or `latest-arm64`
+> if you want the latest build without pinning a version.
+
+### Upgrading
+
+A plugin in use by running containers cannot be disabled or upgraded in-place.
+The versioned alias pattern lets two plugin versions coexist for zero-downtime
+migration:
+
+1. Install the new version under a new alias:
+   ```bash
+   ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
+   docker plugin install --alias baraverkstad/journald-plus:[NEXT] \
+     baraverkstad/journald-plus:[NEXT]-$ARCH
+   ```
+2. Update `daemon.json` or `compose.yml` to reference the new alias.
+3. If using `daemon.json`, restart `dockerd` to pick up the new default driver.
+4. Recreate services to switch them to the new alias one at a time.
+5. Once no containers reference the old alias, remove it:
+   ```bash
+   docker plugin disable baraverkstad/journald-plus:[VER]
+   docker plugin rm baraverkstad/journald-plus:[VER]
+   ```
+
+## Configuration
+
+All options are set via `--log-opt` or the `logging.options` block in
+`docker-compose.yml`. Quick reference:
+
+| Option | Default | Details |
+|--------|---------|---------|
+| `tag` | `{{.Name}}` | [Inherited options](#options-inherited-from-built-in-journald-driver) |
+| `labels`, `labels-regex` | _(none)_ | |
+| `env`, `env-regex` | _(none)_ | |
+| `field-FIELDNAME` | _(none)_ | [Field extraction](#field-extraction-options) |
+| `multiline-regex` | `^\s` | [Multiline options](#multiline-options) |
+| `multiline-timeout` | `10ms` | |
+| `multiline-max-lines` | `100` | |
+| `multiline-max-bytes` | `1048576` | |
+| `multiline-separator` | `\n` | |
+| `priority-prefix` | `true` | [Priority options](#priority-options) |
+| `priority-default-stdout` | `info` | |
+| `priority-default-stderr` | `err` | |
+| `priority-match-*` | _(varies)_ | |
+| `strip-timestamp` | `false` | [Timestamp stripping](#timestamp-stripping) |
+| `strip-timestamp-regex` | _(built-in)_ | |
+| `strip-priority` | `false` | [Priority stripping](#priority-stripping) |
+| `strip-priority-regex` | _(built-in)_ | |
+| `normalize-whitespace` | `false` | [Whitespace normalization](#whitespace-normalization) |
+| `json-parse` | `false` | [JSON log parsing](#json-log-parsing) |
+| `json-level-keys` | `level,severity,log_level` | |
+| `json-message-keys` | `message,msg,log` | |
+| `json-skip-keys` | _(none)_ | |
+| `json-extra` | `fields` | |
 
 ### Options inherited from built-in journald driver
 
@@ -105,12 +158,6 @@ Or set as default in `/etc/docker/daemon.json`:
 | `labels-regex` | Regex matching container label keys to include. |
 | `env` | Comma-separated list of container env var keys to include as journal fields. |
 | `env-regex` | Regex matching container env var keys to include. |
-
-### Field extraction options
-
-| Option | Description |
-|--------|-------------|
-| `field-FIELDNAME` | Extract data from log messages into a custom journald field. The option name specifies the field name (e.g., `field-REQUEST_ID`). The option value is a regex pattern with a capture group `(...)`. The first capture group's value is extracted. Multiple field extractors can be specified. |
 
 **Tag template variables:**
 
@@ -131,7 +178,13 @@ Note: the built-in journald driver defaults tag to `{{.ID}}` (short container ID
 This plugin defaults to `{{.Name}}` (container name), which is more useful with
 `journalctl -t`.
 
-**Field extraction examples:**
+### Field extraction options
+
+| Option | Description |
+|--------|-------------|
+| `field-FIELDNAME` | Extract data from log messages into a custom journald field. The option name specifies the field name (e.g., `field-REQUEST_ID`). The option value is a regex pattern with a capture group `(...)`. The first capture group's value is extracted. Multiple field extractors can be specified. |
+
+**Examples:**
 
 Extract request ID from logs:
 ```bash
@@ -151,7 +204,25 @@ journalctl REQUEST_ID=abc123
 journalctl USER_ID=42
 ```
 
-In `/etc/docker/daemon.json`:
+Options can be set per-service in `docker-compose.yml`:
+```yaml
+services:
+  api:
+    image: myapi:latest
+    logging:
+      driver: baraverkstad/journald-plus:[VER]
+      options:
+        field-REQUEST_ID: 'request_id=([a-z0-9]+)'
+        field-USER_ID: 'user=(\d+)'
+  worker:
+    image: myworker:latest
+    logging:
+      driver: baraverkstad/journald-plus:[VER]
+      options:
+        field-JOB_ID: 'job=([0-9]+)'
+```
+
+In `/etc/docker/daemon.json` (note: backslashes must be escaped):
 ```json
 {
   "log-driver": "baraverkstad/journald-plus:[VER]",
@@ -162,8 +233,6 @@ In `/etc/docker/daemon.json`:
 }
 ```
 
-Note: In JSON, backslashes must be escaped (`\\d` instead of `\d`).
-
 ### Multiline options
 
 | Option | Default | Description |
@@ -173,6 +242,10 @@ Note: In JSON, backslashes must be escaped (`\\d` instead of `\d`).
 | `multiline-max-lines` | `100` | Maximum number of lines to merge into a single journal entry. Safety limit to prevent unbounded buffering. |
 | `multiline-max-bytes` | `1048576` | Maximum total bytes of a merged message (default 1MB). |
 | `multiline-separator` | `\n` | String inserted between merged lines. Default is newline. |
+
+The default `^\s` pattern matches any line beginning with whitespace, which
+handles Java stack traces (`at com.example.Foo` continuation lines are indented)
+and Python tracebacks (frame lines start with spaces) out of the box.
 
 ### Priority options
 
@@ -200,7 +273,7 @@ Priority is resolved in this order (first match wins):
 The `priority-default-stdout` and `priority-default-stderr` options accept
 these values: `emerg`, `alert`, `crit`, `err`, `warning`, `notice`, `info`, `debug`.
 
-### Timestamp stripping (experimental)
+### Timestamp stripping
 
 | Option | Default | Description |
 |--------|---------|-------------|
@@ -228,7 +301,7 @@ Trailing separators (whitespace, `-`, `|`, `:`) after the timestamp are also
 stripped. Timezone abbreviations are limited to Z/UTC/GMT to avoid accidentally
 matching log level words like ERROR or WARN.
 
-### Priority stripping (experimental)
+### Priority stripping
 
 | Option | Default | Description |
 |--------|---------|-------------|
@@ -264,7 +337,7 @@ When enabled, any sequence of one or more tabs (or two or more consecutive space
 | `ERROR  connection refused` | `ERROR connection refused` |
 | `[WARN]\t  disk space low` | `[WARN] disk space low` |
 
-### JSON log parsing (experimental)
+### JSON log parsing
 
 | Option | Default | Description |
 |--------|---------|-------------|
@@ -297,7 +370,7 @@ When `json-parse=true`, the driver attempts to parse each log line as a JSON obj
 
 Level strings are case-insensitive.
 
-**JSON parsing examples:**
+**Examples:**
 
 Basic usage with default keys:
 ```bash
@@ -373,7 +446,7 @@ Results in:
 - If JSON parsing fails, the original line is logged as-is (no data loss)
 - Zero overhead when disabled (single boolean check)
 
-## Journal Fields
+### Journal fields
 
 Each log entry is written to journald with the following fields:
 
@@ -393,31 +466,7 @@ Plus any fields from:
 - `labels`, `labels-regex` options (container labels)
 - `env`, `env-regex` options (environment variables)
 - `field-*` options (extracted from log messages via regex)
-- `parse-json` option (JSON fields with `JSON_` prefix)
-
-## Architecture
-
-This is a Docker managed plugin (v2). It communicates with the Docker daemon
-over the standard log driver plugin protocol:
-
-1. Docker creates a FIFO per container and calls `StartLogging` with the FIFO path
-2. The plugin reads protobuf-encoded `LogEntry` messages from the FIFO
-3. Partial messages (lines >16KB) are reassembled
-4. Multiline merging is applied based on the continuation regex and timeout
-5. Priority is determined from message content
-6. The merged, prioritized message is written to journald via the native socket
-
-The plugin requires the host's journald socket to be mounted into its rootfs
-(`/run/systemd/journal/socket`).
-
-`docker logs` is **not** supported -- use `journalctl` to read logs:
-
-```bash
-journalctl -t myapp                   # by tag (container name or custom tag)
-journalctl -t myapp -p warning        # only warnings and above
-journalctl -t myapp -f                # follow (like tail -f)
-journalctl CONTAINER_ID=abc123def456  # by container ID
-```
+- `json-parse` option (JSON fields with `JSON_` prefix)
 
 ## Development
 
