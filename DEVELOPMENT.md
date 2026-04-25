@@ -30,6 +30,21 @@ make publish      # Build multi-arch plugins and push to Docker Hub
 | `config.json` | Plugin manifest |
 | `tmp/` | Build artifacts |
 
+## Architecture
+
+The plugin implements Docker's managed plugin (v2) log driver interface:
+
+1. Docker creates a FIFO per container and calls `StartLogging` with the FIFO path
+2. The plugin reads protobuf-encoded `LogEntry` messages from the FIFO
+3. Partial messages (lines >16KB) are reassembled into complete log lines
+4. Multiline merging is applied based on the continuation regex and timeout
+5. Priority is determined from message content (prefix, regex patterns, default)
+6. The merged, prioritized message is written to journald via the native socket protocol
+
+The plugin requires the host's journald socket (`/run/systemd/journal/socket`)
+mounted into its rootfs. The consumer per container drains its FIFO fully before
+responding to `StopLogging`, ensuring no log lines are dropped on container stop.
+
 ## Plugin Testing (on Linux)
 
 Install the plugin from a local build or directly from Docker Hub:
