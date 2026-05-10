@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.0 - 2026-05-10
+
+- Documentation updates
+- [Commit list](https://github.com/baraverkstad/docker-journald-plus/compare/v0.7...v1.0)
+
 ## v0.7 - 2026-04-25
 
 - Replaced `net/http` with a minimal HTTP/1.1 handler, reducing binary size by 50%
