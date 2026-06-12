@@ -261,9 +261,9 @@ func ParseConfig(opts map[string]string) (*Config, error) {
 		if !strings.HasPrefix(key, "field-") {
 			continue
 		}
-		fieldName := strings.TrimPrefix(key, "field-")
-		if fieldName == "" {
-			return nil, fmt.Errorf("invalid field extractor key %q: field name cannot be empty", key)
+		fieldName := strings.ToUpper(strings.TrimPrefix(key, "field-"))
+		if err := validateFieldName(fieldName); err != nil {
+			return nil, fmt.Errorf("invalid field extractor key %q: %w", key, err)
 		}
 		if pattern == "" {
 			return nil, fmt.Errorf("invalid field extractor %q: pattern cannot be empty", key)
@@ -283,6 +283,39 @@ func ParseConfig(opts map[string]string) (*Config, error) {
 	}
 
 	return cfg, nil
+}
+
+// reservedFieldNames are emitted by the driver itself; an extractor
+// duplicate would let log content override them in journald.
+var reservedFieldNames = map[string]bool{
+	"MESSAGE":    true,
+	"PRIORITY":   true,
+	"IMAGE_NAME": true,
+}
+
+// validateFieldName enforces journald field name rules (uppercase ASCII,
+// digits, underscore; no leading digit/underscore; max 64 chars) —
+// journald silently drops fields with invalid names.
+func validateFieldName(name string) error {
+	if name == "" {
+		return fmt.Errorf("field name cannot be empty")
+	}
+	if len(name) > 64 {
+		return fmt.Errorf("field name exceeds 64 characters")
+	}
+	if name[0] == '_' || (name[0] >= '0' && name[0] <= '9') {
+		return fmt.Errorf("field name cannot start with a digit or underscore")
+	}
+	for i := range len(name) {
+		c := name[i]
+		if (c < 'A' || c > 'Z') && (c < '0' || c > '9') && c != '_' {
+			return fmt.Errorf("field name contains invalid character %q", c)
+		}
+	}
+	if reservedFieldNames[name] || strings.HasPrefix(name, "SYSLOG_") || strings.HasPrefix(name, "CONTAINER_") {
+		return fmt.Errorf("field name %s is reserved", name)
+	}
+	return nil
 }
 
 func parseBoolOpt(opts map[string]string, key string, def bool) (bool, error) {

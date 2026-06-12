@@ -303,8 +303,9 @@ Example: `--log-opt tag="{{.ImageName}}/{{.Name}}"`
 
 Label and environment variable names are converted to journald-compatible field
 names: lowercase letters become uppercase, non-alphanumeric characters become
-`_`, and names starting with a digit are prefixed with `_`. For example, a label
-`com.example.my-app` becomes the journal field `COM_EXAMPLE_MY_APP`.
+`_`, leading digits and underscores are trimmed (journald rejects them), and
+names are capped at 64 characters. For example, a label `com.example.my-app`
+becomes the journal field `COM_EXAMPLE_MY_APP`.
 
 ### Field extraction
 
@@ -314,6 +315,9 @@ names: lowercase letters become uppercase, non-alphanumeric characters become
 
 **1:** The option name is the field name (e.g. `field-REQUEST_ID`); the value is
 a regex with one capture group `(...)`. Multiple `field-*` options can be used.
+Names are uppercased automatically and must use only letters, digits and `_`
+(max 64 chars, no leading digit or `_`). Reserved names (`MESSAGE`, `PRIORITY`,
+`IMAGE_NAME`, `SYSLOG_*`, `CONTAINER_*`) are rejected.
 
 > 👉 See [Examples](#examples) for usage.
 

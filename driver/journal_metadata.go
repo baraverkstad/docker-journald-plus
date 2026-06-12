@@ -164,8 +164,9 @@ func (w *journalWriter) addFilteredFields(vars map[string]string, source map[str
 
 	for k, v := range source {
 		if keySet[k] || (re != nil && re.MatchString(k)) {
-			fieldName := sanitizeFieldName(k)
-			vars[fieldName] = v
+			if fieldName := journalFieldName(k); fieldName != "" {
+				vars[fieldName] = v
+			}
 		}
 	}
 }
@@ -194,6 +195,17 @@ func sanitizeFieldName(name string) string {
 		return "_" + result
 	}
 	return result
+}
+
+// journalFieldName converts a label/env key to a valid journal field name.
+// journald silently drops names with a digit/underscore prefix (protected)
+// or longer than 64 chars; returns "" if nothing valid remains.
+func journalFieldName(key string) string {
+	name := strings.TrimLeft(sanitizeFieldName(key), "_0123456789")
+	if len(name) > 64 {
+		name = name[:64]
+	}
+	return name
 }
 
 // Write sends a log entry to journald with optional JSON-extracted fields.

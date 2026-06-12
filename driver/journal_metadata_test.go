@@ -1,6 +1,7 @@
 package driver
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -26,6 +27,31 @@ func TestSanitizeFieldName(t *testing.T) {
 			got := sanitizeFieldName(tt.input)
 			if got != tt.want {
 				t.Errorf("sanitizeFieldName(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestJournalFieldName(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"request_id", "REQUEST_ID"},
+		// journald silently drops fields starting with digit/underscore
+		{"123field", "FIELD"},
+		{"_leading_underscore", "LEADING_UNDERSCORE"},
+		{"-weird", "WEIRD"},
+		{"___", ""},
+		// journald drops field names longer than 64 chars
+		{strings.Repeat("a", 70), strings.Repeat("A", 64)},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got := journalFieldName(tt.input)
+			if got != tt.want {
+				t.Errorf("journalFieldName(%q) = %q, want %q", tt.input, got, tt.want)
 			}
 		})
 	}

@@ -1,6 +1,7 @@
 package driver
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -322,6 +323,14 @@ func TestParseConfigRejectsInvalid(t *testing.T) {
 		{"field extractor bad regex", map[string]string{"field-USER_ID": "[invalid"}},
 		{"field extractor empty name", map[string]string{"field-": "pattern"}},
 		{"field extractor empty pattern", map[string]string{"field-TEST": ""}},
+		{"field extractor invalid char", map[string]string{"field-TRACE.ID": "x=(\\d+)"}},
+		{"field extractor leading digit", map[string]string{"field-1ID": "x=(\\d+)"}},
+		{"field extractor leading underscore", map[string]string{"field-_ID": "x=(\\d+)"}},
+		{"field extractor name too long", map[string]string{"field-" + strings.Repeat("A", 65): "x=(\\d+)"}},
+		{"field extractor reserved MESSAGE", map[string]string{"field-MESSAGE": "x=(\\d+)"}},
+		{"field extractor reserved PRIORITY", map[string]string{"field-priority": "x=(\\d+)"}},
+		{"field extractor reserved SYSLOG_ prefix", map[string]string{"field-SYSLOG_PID": "x=(\\d+)"}},
+		{"field extractor reserved CONTAINER_ prefix", map[string]string{"field-CONTAINER_FOO": "x=(\\d+)"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -360,6 +369,23 @@ func TestParseConfigFieldExtractors(t *testing.T) {
 		if !names[want] {
 			t.Errorf("missing field extractor %s", want)
 		}
+	}
+}
+
+// journald only accepts uppercase field names; lowercase extractor names
+// would be silently dropped, so they are normalized at parse time.
+func TestParseConfigFieldExtractorUppercased(t *testing.T) {
+	cfg, err := ParseConfig(map[string]string{
+		"field-trace_id": `trace=([a-f0-9]+)`,
+	})
+	if err != nil {
+		t.Fatalf("ParseConfig: %v", err)
+	}
+	if len(cfg.FieldExtractors) != 1 {
+		t.Fatalf("got %d field extractors, want 1", len(cfg.FieldExtractors))
+	}
+	if got := cfg.FieldExtractors[0].FieldName; got != "TRACE_ID" {
+		t.Errorf("field name = %q, want %q", got, "TRACE_ID")
 	}
 }
 
