@@ -2,6 +2,7 @@ package driver
 
 import (
 	"bufio"
+	"errors"
 	"io"
 	"net"
 	"strings"
@@ -161,6 +162,45 @@ func TestServeConnMalformedContentLength(t *testing.T) {
 				t.Errorf("expected connection close (EOF), got err=%v", err)
 			}
 		})
+	}
+}
+
+// fakeListener returns scripted Accept results.
+type fakeListener struct {
+	results []error // nil = deliver a closed conn, non-nil = return the error
+	calls   int
+}
+
+func (l *fakeListener) Accept() (net.Conn, error) {
+	if l.calls >= len(l.results) {
+		return nil, net.ErrClosed
+	}
+	err := l.results[l.calls]
+	l.calls++
+	if err != nil {
+		return nil, err
+	}
+	client, server := net.Pipe()
+	client.Close()
+	return server, nil
+}
+
+func (l *fakeListener) Close() error   { return nil }
+func (l *fakeListener) Addr() net.Addr { return nil }
+
+// Transient Accept errors must not terminate the serve loop; only a
+// closed listener should.
+func TestServeRetriesTransientAcceptErrors(t *testing.T) {
+	l := &fakeListener{results: []error{
+		errors.New("accept: too many open files"),
+		nil,
+	}}
+	err := Serve(l, map[string]func([]byte) []byte{})
+	if !errors.Is(err, net.ErrClosed) {
+		t.Errorf("Serve returned %v, want net.ErrClosed", err)
+	}
+	if l.calls != 2 {
+		t.Errorf("Accept called %d times, want 2 (transient error not retried)", l.calls)
 	}
 }
 

@@ -2,22 +2,34 @@ package driver
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"net"
+	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Serve accepts connections on l and dispatches requests to routes.
 // routes maps URL path to a handler receiving the request body and
-// returning a JSON response body. Runs until l is closed.
+// returning a JSON response body. Transient accept errors are retried
+// with backoff; runs until l is closed.
 func Serve(l net.Listener, routes map[string]func([]byte) []byte) error {
+	backoff := 10 * time.Millisecond
 	for {
 		conn, err := l.Accept()
 		if err != nil {
-			return err
+			if errors.Is(err, net.ErrClosed) {
+				return err
+			}
+			fmt.Fprintf(os.Stderr, "journald-plus: accept error (retrying): %v\n", err)
+			time.Sleep(backoff)
+			backoff = min(2*backoff, time.Second)
+			continue
 		}
+		backoff = 10 * time.Millisecond
 		go serveConn(conn, routes)
 	}
 }

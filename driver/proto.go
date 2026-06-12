@@ -22,6 +22,10 @@ type partialLogMetadata struct {
 	Ordinal int32
 }
 
+// maxFrameSize caps frame allocation; dockerd splits lines >16 KiB into
+// partials, so larger frames indicate stream corruption.
+const maxFrameSize = 1 << 20
+
 // logEntryDecoder reads length-prefixed protobuf log entries from a reader.
 type logEntryDecoder struct {
 	r      io.Reader
@@ -50,13 +54,16 @@ func newLogEntryDecoder(r io.Reader) *logEntryDecoder {
 //	  field 2 (string):  id
 //	  field 3 (int32):   ordinal
 func (d *logEntryDecoder) decode(entry *logEntry) error {
-	// Read message length
-	if _, err := io.ReadFull(d.r, d.lenBuf[:]); err != nil {
-		return err
+	// Read message length, skipping empty frames
+	var size uint32
+	for size == 0 {
+		if _, err := io.ReadFull(d.r, d.lenBuf[:]); err != nil {
+			return err
+		}
+		size = binary.BigEndian.Uint32(d.lenBuf[:])
 	}
-	size := binary.BigEndian.Uint32(d.lenBuf[:])
-	if size == 0 {
-		return nil
+	if size > maxFrameSize {
+		return fmt.Errorf("frame size %d exceeds maximum %d", size, maxFrameSize)
 	}
 
 	// Grow buffer if needed

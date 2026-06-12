@@ -139,6 +139,32 @@ func TestDecodePartialEntry(t *testing.T) {
 	}
 }
 
+func TestDecodeSkipsZeroLengthFrames(t *testing.T) {
+	var buf bytes.Buffer
+	buf.Write(wrapWithLength(nil)) // zero-length frame
+	buf.Write(wrapWithLength(buildLogEntry("stdout", 1000, "hello", false)))
+
+	dec := newLogEntryDecoder(&buf)
+	var entry logEntry
+	if err := dec.decode(&entry); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if string(entry.Line) != "hello" {
+		t.Errorf("line = %q, want %q (zero-length frame should be skipped)", entry.Line, "hello")
+	}
+}
+
+func TestDecodeRejectsOversizedFrame(t *testing.T) {
+	var buf [4]byte
+	binary.BigEndian.PutUint32(buf[:], 0xfffffff0)
+
+	dec := newLogEntryDecoder(bytes.NewReader(buf[:]))
+	var entry logEntry
+	if err := dec.decode(&entry); err == nil {
+		t.Error("expected error for oversized frame, got nil")
+	}
+}
+
 func TestDecodeMultipleEntries(t *testing.T) {
 	var buf bytes.Buffer
 	for i := range 3 {

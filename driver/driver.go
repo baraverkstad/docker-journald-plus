@@ -158,11 +158,11 @@ func (lc *logConsumer) logError(format string, args ...any) {
 
 	if elapsed >= time.Minute {
 		if lc.suppressedErrs > 0 {
-			fmt.Printf("journald-plus: suppressed %d errors in last %v\n",
+			fmt.Fprintf(os.Stderr, "journald-plus: suppressed %d errors in last %v\n",
 				lc.suppressedErrs, elapsed.Round(time.Second))
 			lc.suppressedErrs = 0
 		}
-		fmt.Printf("journald-plus: "+format+"\n", args...)
+		fmt.Fprintf(os.Stderr, "journald-plus: "+format+"\n", args...)
 		lc.lastErrLog = now
 	} else {
 		lc.suppressedErrs++

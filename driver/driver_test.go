@@ -15,10 +15,10 @@ import (
 )
 
 func TestLogErrorRateLimiting(t *testing.T) {
-	// Capture stdout
-	oldStdout := os.Stdout
+	// Capture stderr
+	oldStderr := os.Stderr
 	r, w, _ := os.Pipe()
-	os.Stdout = w
+	os.Stderr = w
 
 	lc := &logConsumer{}
 
@@ -36,7 +36,7 @@ func TestLogErrorRateLimiting(t *testing.T) {
 	w.Close()
 	var buf bytes.Buffer
 	io.Copy(&buf, r)
-	os.Stdout = oldStdout
+	os.Stderr = oldStderr
 
 	output := buf.String()
 	lines := strings.Split(strings.TrimSpace(output), "\n")
@@ -57,10 +57,10 @@ func TestLogErrorRateLimiting(t *testing.T) {
 func TestLogErrorAfterCooldown(t *testing.T) {
 	lc := &logConsumer{}
 
-	// Capture stdout
-	oldStdout := os.Stdout
+	// Capture stderr
+	oldStderr := os.Stderr
 	r, w, _ := os.Pipe()
-	os.Stdout = w
+	os.Stderr = w
 
 	// Log first error
 	lc.logError("error 1")
@@ -78,7 +78,7 @@ func TestLogErrorAfterCooldown(t *testing.T) {
 	w.Close()
 	var buf bytes.Buffer
 	io.Copy(&buf, r)
-	os.Stdout = oldStdout
+	os.Stderr = oldStderr
 
 	output := buf.String()
 
