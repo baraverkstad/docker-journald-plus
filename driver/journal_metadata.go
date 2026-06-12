@@ -214,10 +214,9 @@ func (w *journalWriter) Write(msg mergedMessage, pri Priority, processedLine []b
 		maps.Copy(vars, extractedFields)
 	}
 
-	// Add timestamp
-	ts := time.Unix(0, msg.TimeNano)
-	if !ts.IsZero() {
-		vars["SYSLOG_TIMESTAMP"] = ts.Format(time.RFC3339Nano)
+	// Add timestamp (omit when absent from the log entry)
+	if msg.TimeNano != 0 {
+		vars["SYSLOG_TIMESTAMP"] = time.Unix(0, msg.TimeNano).Format(time.RFC3339Nano)
 	}
 
 	// Send to journal

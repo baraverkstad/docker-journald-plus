@@ -97,6 +97,38 @@ func TestJournalWriterBaseVars(t *testing.T) {
 	}
 }
 
+func TestJournalWriterOmitsTimestampForZeroTimeNano(t *testing.T) {
+	cfg := mustConfig(t, map[string]string{})
+	info := containerInfo{ContainerID: "abcdef123456", ContainerName: "/test"}
+
+	var lastVars map[string]string
+	sendFn := func(message string, priority Priority, vars map[string]string) error {
+		lastVars = vars
+		return nil
+	}
+
+	w, err := newJournalWriter(cfg, info, sendFn)
+	if err != nil {
+		t.Fatalf("newJournalWriter: %v", err)
+	}
+
+	msg := mergedMessage{Line: []byte("x"), Source: "stdout", TimeNano: 0}
+	if err := w.Write(msg, PriInfo, []byte("x"), nil); err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	if ts, ok := lastVars["SYSLOG_TIMESTAMP"]; ok {
+		t.Errorf("SYSLOG_TIMESTAMP = %q, want omitted for TimeNano=0", ts)
+	}
+
+	msg = mergedMessage{Line: []byte("x"), Source: "stdout", TimeNano: 1000000000}
+	if err := w.Write(msg, PriInfo, []byte("x"), nil); err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	if _, ok := lastVars["SYSLOG_TIMESTAMP"]; !ok {
+		t.Error("SYSLOG_TIMESTAMP missing for non-zero TimeNano")
+	}
+}
+
 func TestJournalWriterCustomTag(t *testing.T) {
 	cfg := mustConfig(t, map[string]string{
 		"tag": "myapp",
