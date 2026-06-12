@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Fixed loss of final log entries on container stop — the FIFO is now drained
+  to EOF (max 5s) before responding to `StopLogging` (#9)
+
 ## v1.0 - 2026-05-10
 
 - Documentation updates

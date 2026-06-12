@@ -3,6 +3,7 @@ package driver
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -168,16 +169,47 @@ func (lc *logConsumer) logError(format string, args ...any) {
 	}
 }
 
+// stopDrainTimeout bounds FIFO draining after StopLogging. Dockerd closes
+// the FIFO write end when the container exits, so EOF arrives naturally;
+// the deadline only guards against a hung writer or stalled journald.
+const stopDrainTimeout = 5 * time.Second
+
+// pollingReader retries EAGAIN reads on platforms where the runtime cannot
+// poll FIFOs (e.g. macOS). On Linux, FIFO reads block in the poller and
+// EAGAIN never surfaces, making this a pass-through.
+type pollingReader struct {
+	f          *os.File
+	ctx        context.Context
+	drainUntil time.Time
+}
+
+func (r *pollingReader) Read(p []byte) (int, error) {
+	for {
+		n, err := r.f.Read(p)
+		if n > 0 || !errors.Is(err, syscall.EAGAIN) {
+			return n, err
+		}
+		if r.ctx.Err() != nil {
+			if r.drainUntil.IsZero() {
+				r.drainUntil = time.Now().Add(stopDrainTimeout)
+			} else if time.Now().After(r.drainUntil) {
+				return 0, r.ctx.Err()
+			}
+		}
+		time.Sleep(time.Millisecond)
+	}
+}
+
 // consumeLog reads log entries from the FIFO, reassembles partials,
 // merges multiline, detects priority, and writes to journald.
-func (d *Driver) consumeLog(ctx context.Context, f io.ReadCloser, lc *logConsumer) {
+func (d *Driver) consumeLog(ctx context.Context, f *os.File, lc *logConsumer) {
 	defer close(lc.done)
 	defer f.Close()
 
-	// Ensure FIFO is closed when context is canceled to interrupt blocking reads
 	go func() {
 		<-ctx.Done()
-		f.Close()
+		// On unpollable FIFOs this fails; pollingReader bounds the drain instead.
+		_ = f.SetReadDeadline(time.Now().Add(stopDrainTimeout))
 	}()
 
 	partial := newPartialAssembler()
@@ -237,7 +269,7 @@ func (d *Driver) consumeLog(ctx context.Context, f io.ReadCloser, lc *logConsume
 		}
 	})
 
-	dec := newLogEntryDecoder(f)
+	dec := newLogEntryDecoder(&pollingReader{f: f, ctx: ctx})
 	for {
 		var entry logEntry
 		if err := dec.decode(&entry); err != nil {

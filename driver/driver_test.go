@@ -2,9 +2,14 @@ package driver
 
 import (
 	"bytes"
+	"encoding/binary"
+	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
+	"sync"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -86,5 +91,66 @@ func TestLogErrorAfterCooldown(t *testing.T) {
 	}
 	if lc.suppressedErrs != 0 {
 		t.Errorf("expected suppressed counter reset, got %d", lc.suppressedErrs)
+	}
+}
+
+func TestStopLoggingDrainsFifo(t *testing.T) {
+	var mu sync.Mutex
+	var count int
+	send := func(message string, priority Priority, vars map[string]string) error {
+		time.Sleep(500 * time.Microsecond) // simulate slow journald
+		mu.Lock()
+		count++
+		mu.Unlock()
+		return nil
+	}
+	d := NewWithSendFunc(send)
+
+	dir := t.TempDir()
+	fifo := filepath.Join(dir, "log.fifo")
+	if err := syscall.Mkfifo(fifo, 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	// Like dockerd, hold the FIFO write end open before StartLogging
+	// (O_WRONLY open blocks until the driver opens the read end).
+	const n = 200
+	written := make(chan error, 1)
+	go func() {
+		w, err := os.OpenFile(fifo, os.O_WRONLY, 0)
+		if err != nil {
+			written <- err
+			return
+		}
+		for i := range n {
+			entry := buildLogEntry("stdout", int64(i+1), fmt.Sprintf("line %d", i), false)
+			var frame [4]byte
+			binary.BigEndian.PutUint32(frame[:], uint32(len(entry)))
+			if _, err := w.Write(append(frame[:], entry...)); err != nil {
+				w.Close()
+				written <- err
+				return
+			}
+		}
+		written <- w.Close()
+	}()
+
+	req := fmt.Sprintf(`{"File":%q,"Info":{"Config":{"multiline-regex":""},"ContainerID":"abcdef123456","ContainerName":"/test"}}`, fifo)
+	if resp := d.handleStartLogging([]byte(req)); string(resp) != `{"Err":""}` {
+		t.Fatalf("start: %s", resp)
+	}
+	if err := <-written; err != nil {
+		t.Fatal(err)
+	}
+
+	// Docker sends StopLogging after the container exits; buffered entries
+	// must still be drained before responding.
+	d.handleStopLogging(fmt.Appendf(nil, `{"File":%q}`, fifo))
+
+	mu.Lock()
+	got := count
+	mu.Unlock()
+	if got != n {
+		t.Errorf("got %d messages, want %d (%d entries lost at StopLogging)", got, n, n-got)
 	}
 }
