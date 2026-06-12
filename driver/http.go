@@ -22,6 +22,10 @@ func Serve(l net.Listener, routes map[string]func([]byte) []byte) error {
 	}
 }
 
+// maxRequestBody caps request body allocation; Docker's log driver
+// requests are tiny, so anything larger indicates a malformed request.
+const maxRequestBody = 1 << 20
+
 // serveConn handles the HTTP/1.1 keep-alive loop for a single connection.
 func serveConn(conn net.Conn, routes map[string]func([]byte) []byte) {
 	defer conn.Close()
@@ -46,6 +50,9 @@ func serveConn(conn net.Conn, routes map[string]func([]byte) []byte) {
 		}
 
 		// Body
+		if bodyLen < 0 || bodyLen > maxRequestBody {
+			return
+		}
 		body := make([]byte, bodyLen)
 		if _, err := io.ReadFull(br, body); err != nil {
 			return

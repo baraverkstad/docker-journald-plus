@@ -131,6 +131,8 @@ func TestParseContentLength(t *testing.T) {
 		{"CONTENT-LENGTH: 123\r\n", 123, true},
 		{"Content-Type: application/json\r\n", 0, false},
 		{"Content-Length: abc\r\n", 0, false},
+		{"Content-Length: -1\r\n", -1, true},
+		{"Content-Length: -42\r\n", -42, true},
 		{"\r\n", 0, false},
 	}
 	for _, c := range cases {
@@ -138,6 +140,27 @@ func TestParseContentLength(t *testing.T) {
 		if ok != c.ok || n != c.n {
 			t.Errorf("parseContentLength(%q) = (%d, %v), want (%d, %v)", c.header, n, ok, c.n, c.ok)
 		}
+	}
+}
+
+// Malformed Content-Length must not panic or allocate unbounded memory;
+// the connection is closed without a response.
+func TestServeConnMalformedContentLength(t *testing.T) {
+	for _, cl := range []string{"-1", "4000000000"} {
+		t.Run(cl, func(t *testing.T) {
+			c := newHTTPClient(map[string]func([]byte) []byte{
+				"/foo": func([]byte) []byte { return []byte(`{"Err":""}`) },
+			})
+			defer c.close()
+
+			req := "POST /foo HTTP/1.1\r\nContent-Length: " + cl + "\r\n\r\n"
+			if _, err := io.WriteString(c.conn, req); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := c.br.ReadString('\n'); err != io.EOF {
+				t.Errorf("expected connection close (EOF), got err=%v", err)
+			}
+		})
 	}
 }
 
