@@ -154,3 +154,92 @@ func TestStopLoggingDrainsFifo(t *testing.T) {
 		t.Errorf("got %d messages, want %d (%d entries lost at StopLogging)", got, n, n-got)
 	}
 }
+
+// A second StartLogging for the same FIFO must cancel the previous
+// consumer instead of orphaning its goroutine in the registry.
+func TestStartLoggingReplacesExistingConsumer(t *testing.T) {
+	defer func(d time.Duration) { stopDrainTimeout = d }(stopDrainTimeout)
+	stopDrainTimeout = 100 * time.Millisecond
+
+	d := NewWithSendFunc(func(string, Priority, map[string]string) error { return nil })
+
+	dir := t.TempDir()
+	fifo := filepath.Join(dir, "log.fifo")
+	if err := syscall.Mkfifo(fifo, 0600); err != nil {
+		t.Fatal(err)
+	}
+	opened := make(chan *os.File, 1)
+	go func() {
+		w, err := os.OpenFile(fifo, os.O_WRONLY, 0)
+		if err == nil {
+			opened <- w
+		}
+	}()
+
+	req := fmt.Sprintf(`{"File":%q,"Info":{"Config":{},"ContainerID":"abcdef123456","ContainerName":"/test"}}`, fifo)
+	if resp := d.handleStartLogging([]byte(req)); string(resp) != `{"Err":""}` {
+		t.Fatalf("start 1: %s", resp)
+	}
+	w := <-opened
+	defer w.Close()
+
+	d.mu.Lock()
+	first := d.consumers[fifo]
+	d.mu.Unlock()
+
+	if resp := d.handleStartLogging([]byte(req)); string(resp) != `{"Err":""}` {
+		t.Fatalf("start 2: %s", resp)
+	}
+
+	select {
+	case <-first.done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("first consumer not stopped by second StartLogging")
+	}
+
+	d.mu.Lock()
+	second := d.consumers[fifo]
+	n := len(d.consumers)
+	d.mu.Unlock()
+	if second == first || second == nil || n != 1 {
+		t.Errorf("registry not replaced: %d entries, replaced=%v", n, second != first)
+	}
+
+	d.handleStopLogging(fmt.Appendf(nil, `{"File":%q}`, fifo))
+}
+
+// A consumer that exits at EOF must remove itself from the registry
+// without waiting for a StopLogging that may never arrive.
+func TestConsumerRemovesItselfOnEOF(t *testing.T) {
+	d := NewWithSendFunc(func(string, Priority, map[string]string) error { return nil })
+
+	dir := t.TempDir()
+	fifo := filepath.Join(dir, "log.fifo")
+	if err := syscall.Mkfifo(fifo, 0600); err != nil {
+		t.Fatal(err)
+	}
+	go func() {
+		if w, err := os.OpenFile(fifo, os.O_WRONLY, 0); err == nil {
+			w.Close() // immediate EOF for the consumer
+		}
+	}()
+
+	req := fmt.Sprintf(`{"File":%q,"Info":{"Config":{},"ContainerID":"abcdef123456","ContainerName":"/test"}}`, fifo)
+	if resp := d.handleStartLogging([]byte(req)); string(resp) != `{"Err":""}` {
+		t.Fatalf("start: %s", resp)
+	}
+
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		d.mu.Lock()
+		n := len(d.consumers)
+		d.mu.Unlock()
+		if n == 0 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("%d consumers still registered after EOF", n)
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}

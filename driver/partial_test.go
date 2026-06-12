@@ -111,3 +111,57 @@ func TestPartialOutOfOrder(t *testing.T) {
 		t.Errorf("line = %q, want %q (sorted by ordinal)", string(line), "ABC")
 	}
 }
+
+// A group exceeding the byte cap is flushed as-is instead of buffering
+// the container's output without bound.
+func TestPartialFlushesOversizeGroup(t *testing.T) {
+	pa := newPartialAssembler()
+	chunk := make([]byte, 16*1024)
+
+	var flushed []byte
+	parts := 0
+	for range 2 * maxPartialBytes / len(chunk) {
+		line, _, _, ok := pa.Add(&logEntry{
+			Source:  "stdout",
+			Line:    chunk,
+			Partial: true,
+			PartialLogMetadata: &partialLogMetadata{
+				ID:      "big",
+				Ordinal: int32(parts),
+				Last:    false,
+			},
+		})
+		parts++
+		if ok {
+			flushed = line
+			break
+		}
+	}
+	if flushed == nil {
+		t.Fatalf("group never flushed after %d parts (%d bytes buffered)",
+			parts, parts*len(chunk))
+	}
+	if len(flushed) > maxPartialBytes+len(chunk) {
+		t.Errorf("flushed %d bytes, cap is %d", len(flushed), maxPartialBytes)
+	}
+}
+
+// Groups whose Last entry never arrives must not accumulate forever.
+func TestPartialEvictsStaleGroups(t *testing.T) {
+	pa := newPartialAssembler()
+	for i := range maxPartialGroups + 5 {
+		pa.Add(&logEntry{
+			Source:  "stdout",
+			Line:    []byte("x"),
+			Partial: true,
+			PartialLogMetadata: &partialLogMetadata{
+				ID:      string(rune('a' + i)),
+				Ordinal: 0,
+				Last:    false,
+			},
+		})
+	}
+	if len(pa.groups) > maxPartialGroups {
+		t.Errorf("%d groups buffered, cap is %d", len(pa.groups), maxPartialGroups)
+	}
+}

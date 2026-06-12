@@ -4,6 +4,15 @@
 
 - Fixed loss of final log entries on container stop — the FIFO is now drained
   to EOF (max 5s) before responding to `StopLogging` (#9)
+- Fixed plugin crash and unbounded allocation on malformed HTTP requests (#4)
+- Fixed `SYSLOG_TIMESTAMP` emitted as `1970-01-01` for entries without a
+  timestamp (#5)
+- Validate `field-*` extractor names (auto-uppercased, reserved names
+  rejected) and label/env field names, which journald would silently drop (#6)
+- Capped partial-message buffering and cleaned up stale consumers to prevent
+  unbounded memory growth (#7)
+- Improved robustness: skip empty log frames, cap frame size, retry transient
+  accept errors, log diagnostics to stderr (#8)
 
 ## v1.0 - 2026-05-10
 

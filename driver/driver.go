@@ -96,6 +96,15 @@ func (d *Driver) handleStartLogging(body []byte) []byte {
 		return respondErr(fmt.Errorf("creating journal writer: %w", err))
 	}
 
+	// Stop a previous consumer for the same FIFO instead of orphaning it
+	d.mu.Lock()
+	old := d.consumers[req.File]
+	d.mu.Unlock()
+	if old != nil {
+		old.cancel()
+		<-old.done
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
 
@@ -172,7 +181,8 @@ func (lc *logConsumer) logError(format string, args ...any) {
 // stopDrainTimeout bounds FIFO draining after StopLogging. Dockerd closes
 // the FIFO write end when the container exits, so EOF arrives naturally;
 // the deadline only guards against a hung writer or stalled journald.
-const stopDrainTimeout = 5 * time.Second
+// Variable to allow shortening in tests.
+var stopDrainTimeout = 5 * time.Second
 
 // pollingReader retries EAGAIN reads on platforms where the runtime cannot
 // poll FIFOs (e.g. macOS). On Linux, FIFO reads block in the poller and
@@ -204,6 +214,15 @@ func (r *pollingReader) Read(p []byte) (int, error) {
 // merges multiline, detects priority, and writes to journald.
 func (d *Driver) consumeLog(ctx context.Context, f *os.File, lc *logConsumer) {
 	defer close(lc.done)
+	// Deregister on exit (EOF/error) so the registry cannot grow when
+	// StopLogging never arrives
+	defer func() {
+		d.mu.Lock()
+		if d.consumers[lc.fifoPath] == lc {
+			delete(d.consumers, lc.fifoPath)
+		}
+		d.mu.Unlock()
+	}()
 	defer f.Close()
 
 	go func() {
