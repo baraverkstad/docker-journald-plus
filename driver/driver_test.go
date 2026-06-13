@@ -211,6 +211,9 @@ func TestStartLoggingReplacesExistingConsumer(t *testing.T) {
 // A consumer that exits at EOF must remove itself from the registry
 // without waiting for a StopLogging that may never arrive.
 func TestConsumerRemovesItselfOnEOF(t *testing.T) {
+	defer func(d time.Duration) { stopDrainTimeout = d }(stopDrainTimeout)
+	stopDrainTimeout = 100 * time.Millisecond
+
 	d := NewWithSendFunc(func(string, Priority, map[string]string) error { return nil })
 
 	dir := t.TempDir()

@@ -191,12 +191,27 @@ type pollingReader struct {
 	f          *os.File
 	ctx        context.Context
 	drainUntil time.Time
+	seenData   bool
 }
 
 func (r *pollingReader) Read(p []byte) (int, error) {
 	for {
 		n, err := r.f.Read(p)
-		if n > 0 || !errors.Is(err, syscall.EAGAIN) {
+		if n > 0 {
+			r.seenData = true
+			r.drainUntil = time.Time{}
+			return n, err
+		}
+		if err == io.EOF && !r.seenData && r.ctx.Err() == nil {
+			if r.drainUntil.IsZero() {
+				r.drainUntil = time.Now().Add(stopDrainTimeout)
+			} else if time.Now().After(r.drainUntil) {
+				return n, err
+			}
+			time.Sleep(time.Millisecond)
+			continue
+		}
+		if !errors.Is(err, syscall.EAGAIN) {
 			return n, err
 		}
 		if r.ctx.Err() != nil {
